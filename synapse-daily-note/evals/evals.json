@@ -1,0 +1,49 @@
+{
+  "skill_name": "synapse-daily-note",
+  "test_fixture": "f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+  "evals": [
+    {
+      "id": 1,
+      "name": "ingest-endpoint-note-dry-run",
+      "prompt": "记一条记忆：我在 feat_login 里新增了 POST /api/v1/auth/refresh 接口，用了 JWT，返回 access_token 和 refresh_token。项目路径 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas。先用 dry-run 看看 proposal。",
+      "expected_output": "Agent runs synapse_note.sh --dry-run, ingest_memory.py identifies feat_login as target, extracts /api/v1/auth/refresh endpoint, suggest_edges.sh finds mod_auth-api edge, no files are modified.",
+      "assertions": [
+        {"name": "targets-correct-node", "description": "Identifies feat_login as the target", "check": "content_contains", "expected": "feat_login"},
+        {"name": "extracts-endpoint", "description": "Captures the API endpoint path", "check": "content_contains", "expected": "/api/v1/auth/refresh"},
+        {"name": "suggests-auth-edge", "description": "Auto-suggests edge to mod_auth-api", "check": "content_contains", "expected": "mod_auth-api"},
+        {"name": "dry-run-no-write", "description": "Does not modify files in dry-run", "check": "content_contains", "expected": "applied: no"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "edge-mode-auto-apply",
+      "prompt": "用 --edge-mode auto --yes 记录一条：支付模块接好了微信支付回调 POST /api/v1/payments/wechat-callback，更新用户会员状态。项目路径 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas。确认变更已应用到 meta 文件和 MEMORY_MAP。",
+      "expected_output": "Agent runs full pipeline, applies high-confidence edges to auto_linked, rebuilds MEMORY_MAP, runs doctor.",
+      "assertions": [
+        {"name": "applies-changes", "description": "Pipeline reports successful apply", "check": "content_contains", "expected": "applied: yes"},
+        {"name": "rebuilds-map", "description": "MEMORY_MAP is regenerated", "check": "content_contains", "expected": "map: regenerated"},
+        {"name": "doctor-passes", "description": "Health check passes after apply", "check": "content_contains", "expected": "doctor: passed"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "create-new-feat-node",
+      "prompt": "记录一下：我们要开始做一个新的 admin dashboard 功能，包含用户管理、统计图表和系统通知面板。这是一个全新的功能，之前没有任何记忆节点。项目路径 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas。先用 dry-run 看看 proposal 会创建什么。",
+      "expected_output": "Agent sees action=create_node in proposal, target_node=meta/feat_admin-dashboard.md, no existing node matches the topic.",
+      "assertions": [
+        {"name": "create-action", "description": "Proposal action is create_node", "check": "content_contains", "expected": "create_node"},
+        {"name": "new-node-name", "description": "New feat node is named admin-dashboard", "check": "content_contains", "expected": "admin-dashboard"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "interactive-menu-displayed",
+      "prompt": "记一条记忆：通知模块加了一个邮件发送通道，调用了 sendgrid API。项目路径 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas。不要用 --yes，让我看看交互菜单。",
+      "expected_output": "Agent runs without --yes, interactive menu is displayed (Choose action: 1-5), user can select edge mode.",
+      "assertions": [
+        {"name": "shows-menu", "description": "Interactive menu is displayed", "check": "content_contains", "expected": "Choose action"},
+        {"name": "shows-options", "description": "All 5 options are shown", "check": "content_contains", "expected": "auto_linked"}
+      ]
+    }
+  ]
+}

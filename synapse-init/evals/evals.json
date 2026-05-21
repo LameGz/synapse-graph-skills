@@ -1,0 +1,47 @@
+{
+  "skill_name": "synapse-init",
+  "test_fixture": "f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+  "evals": [
+    {
+      "id": 1,
+      "name": "init-detects-stack-and-creates-structure",
+      "prompt": "帮我在 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas 项目里初始化 Synapse 记忆系统。这是一个已经有一些 meta 文件的测试项目，帮我看看 init 能不能正常跑完。",
+      "expected_output": "Agent runs init.sh, detects existing meta/ directory, skips existing nodes, detects tech stack from existing mod_project.md, generates MEMORY_MAP.md.",
+      "assertions": [
+        {"name": "runs-without-error", "description": "Init completes without fatal errors", "check": "content_contains", "expected": "Synapse initialized"},
+        {"name": "generates-map", "description": "MEMORY_MAP.md is generated or regenerated", "check": "file_exists", "expected": "MEMORY_MAP.md"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "init-single-module-fallback",
+      "prompt": "Initialize Synapse memory for an empty scratch project at f:/大模型项目/Synapse/test-fixtures/scratch-project (create it if it doesn't exist — it has no package.json, no src/ directories, just a README).",
+      "expected_output": "Agent detects unknown stack, creates only mod_project.md with status in-progress, warns about no detected modules, generates minimal MEMORY_MAP.",
+      "assertions": [
+        {"name": "handles-unknown-stack", "description": "Does not crash on unknown stack", "check": "content_contains", "expected": "unknown"},
+        {"name": "creates-project-node", "description": "Creates at least mod_project.md", "check": "file_exists", "expected": "meta/mod_project.md"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "init-copies-scripts-and-hooks",
+      "prompt": "Initialize Synapse at f:/大模型项目/Synapse/test-fixtures/fresh-init — this is a brand new project with package.json (React app). Make sure all helper scripts and hooks are copied over.",
+      "expected_output": "Agent runs init, scripts/ directory populated with 5+ scripts, scripts/hooks/ has 4 hook files, .claude/settings.json has hook registrations.",
+      "assertions": [
+        {"name": "copies-scripts", "description": "Helper scripts are copied to project", "check": "file_exists", "expected": "scripts/generate_memory_map.sh"},
+        {"name": "registers-hooks", "description": "Hook scripts are deployed", "check": "file_exists", "expected": "scripts/hooks/pre-read-check.sh"},
+        {"name": "detects-react", "description": "Tech stack detection finds React", "check": "content_contains", "expected": "React"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "init-idempotent-rerun",
+      "prompt": "Re-run synapse-init on the already-initialized f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas. Verify existing nodes are not overwritten — they should show 'already exists' messages.",
+      "expected_output": "Agent re-runs init.sh, all existing files are skipped, script reports 'already exists' for each, exits successfully without modifying any existing .md files.",
+      "assertions": [
+        {"name": "skips-existing", "description": "Reports skipping existing files", "check": "content_contains", "expected": "already exists"},
+        {"name": "completes-successfully", "description": "Exits with success message", "check": "content_contains", "expected": "Synapse initialized"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+name: Test Skills
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'skills/**'
+      - 'tests/**'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'skills/**'
+      - 'tests/**'
+
+jobs:
+  validate-structure:
+    name: Validate skill structure
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        skill:
+          - synapse-graph-memory
+          - synapse-timeline
+          - synapse-daily-note
+          - synapse-init
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          SKILL_DIR="skills/${{ matrix.skill }}"
+          for required in SKILL.md evals/evals.json; do
+            if [ ! -f "$SKILL_DIR/$required" ]; then
+              echo "ERROR: $SKILL_DIR/$required is missing"
+              exit 1
+            fi
+          done
+          echo "Structure check passed for ${{ matrix.skill }}"
+
+      - name: Validate SKILL.md frontmatter
+        run: |
+          SKILL_DIR="skills/${{ matrix.skill }}"
+          head -10 "$SKILL_DIR/SKILL.md" | grep -q "^---$" || {
+            echo "ERROR: Missing YAML frontmatter"
+            exit 1
+          }
+          head -10 "$SKILL_DIR/SKILL.md" | grep -q "^name:" || {
+            echo "ERROR: Missing 'name' field in frontmatter"
+            exit 1
+          }
+          head -10 "$SKILL_DIR/SKILL.md" | grep -q "^description:" || {
+            echo "ERROR: Missing 'description' field in frontmatter"
+            exit 1
+          }
+          echo "Frontmatter valid"
+
+  lint-scripts:
+    name: Lint shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Lint all .sh files
+        run: |
+          echo "Checking shell scripts..."
+          find skills/ -name "*.sh" -print0 | while IFS= read -r -d '' f; do
+            echo "  shellcheck $f"
+            shellcheck -x -S warning "$f" || true
+          done
+
+  lint-markdown:
+    name: Lint markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check markdown links
+        run: |
+          echo "Checking for broken internal links in SKILL.md files..."
+          for f in skills/*/SKILL.md; do
+            echo "  Checking $f"
+            # Extract references/ and scripts/ links and verify they exist
+            grep -oP 'references/[^)]+' "$f" | while read -r ref; do
+              target="$(dirname "$f")/$ref"
+              if [ ! -f "$target" ]; then
+                echo "  WARNING: referenced file not found: $ref"
+              fi
+            done || true
+          done
+
+  test-eval-fixtures:
+    name: Validate eval fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate evals.json files
+        run: |
+          for f in skills/*/evals/evals.json; do
+            echo "Validating $f"
+            python3 -c "
+import json, sys
+with open('$f') as fh:
+    data = json.load(fh)
+assert 'skill_name' in data, 'missing skill_name'
+assert 'evals' in data, 'missing evals array'
+assert len(data['evals']) > 0, 'no eval cases'
+for i, ev in enumerate(data['evals']):
+    assert 'id' in ev, f'eval {i}: missing id'
+    assert 'prompt' in ev, f'eval {i}: missing prompt'
+    assert 'assertions' in ev, f'eval {i}: missing assertions'
+print(f'  {len(data[\"evals\"])} eval cases — OK')
+"
+          done

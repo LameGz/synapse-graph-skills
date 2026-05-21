@@ -1,0 +1,48 @@
+{
+  "skill_name": "synapse-timeline",
+  "test_fixture": "f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+  "evals": [
+    {
+      "id": 1,
+      "name": "basic-timeline-all-entries",
+      "prompt": "帮我看一下 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas 项目最近所有的改动记录。",
+      "expected_output": "Agent runs query_timeline.sh, outputs sorted Change Log entries from all meta/*.md nodes, showing dates in YYYY-MM-DD format with node paths and summaries.",
+      "assertions": [
+        {"name": "shows-recent-dates", "description": "Output contains 2026-05 dates", "check": "content_contains", "expected": "2026-05-"},
+        {"name": "shows-node-paths", "description": "Output references meta/ paths", "check": "content_contains", "expected": "meta/"},
+        {"name": "sorted-newest-first", "description": "2026-05-12 entries appear before 2026-05-11", "check": "order_check", "expected": ["2026-05-12", "2026-05-11"]}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "tag-filtered-timeline",
+      "prompt": "查询 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas 项目里 tag 为 auth 的所有变更记录，只显示最近 5 条。",
+      "expected_output": "Agent uses --tag auth --limit 5, returns entries only from mod_auth-api and feat_login, not from mod_payment or other unrelated nodes.",
+      "assertions": [
+        {"name": "includes-auth-module", "description": "Finds mod_auth-api via auth tag", "check": "content_contains", "expected": "mod_auth-api"},
+        {"name": "includes-login-feature", "description": "Also finds feat_login via auth tag", "check": "content_contains", "expected": "feat_login"},
+        {"name": "excludes-unrelated", "description": "Does not include payment module entries", "check": "must_not_contain", "expected": "mod_payment"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "open-issues-query",
+      "prompt": "查看 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas 项目里所有还没解决的问题。",
+      "expected_output": "Agent runs query_timeline.sh --issues, lists Open Issues section content from all nodes.",
+      "assertions": [
+        {"name": "uses-issues-mode", "description": "Output shows Open Issues header", "check": "content_contains", "expected": "Open Issues"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "summary-with-recent-filter",
+      "prompt": "用 summary 模式查看 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas 最近 7 天的变更概况，告诉我改了多少条、涉及多少个节点。",
+      "expected_output": "Agent runs with --recent 7 --summary, output includes Summary block with entries/nodes/tags counts before individual entries.",
+      "assertions": [
+        {"name": "shows-summary-block", "description": "Output has Summary header", "check": "content_contains", "expected": "Summary:"},
+        {"name": "shows-entry-count", "description": "Reports total entries count", "check": "content_contains", "expected": "entries:"},
+        {"name": "shows-node-count", "description": "Reports unique nodes count", "check": "content_contains", "expected": "nodes:"}
+      ]
+    }
+  ]
+}

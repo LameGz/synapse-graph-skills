@@ -1,0 +1,84 @@
+{
+  "name": "synapse-graph-skills",
+  "version": "1.0.0",
+  "release_date": "2026-05-21",
+  "status": "stable",
+  "description": "Engineering memory system for solo full-stack developers — partitioned context loading via graph topology.",
+  "skills": {
+    "synapse-graph-memory": {
+      "version": "1.0.0",
+      "path": "skills/synapse-graph-memory/",
+      "package": "synapse-graph-memory.skill",
+      "size_kb": 66,
+      "description": "Core retrieval protocol — 7-step decision tree with three-layer progressive disclosure. Handles status queries, cross-module impact analysis, and bounded BFS traversal.",
+      "triggers": ["XX 做得怎么样了", "会影响哪些功能", "加载记忆节点", "上次做到哪了"],
+      "scripts": ["init.sh", "synapse_note.sh", "query_timeline.sh", "generate_memory_map.sh", "suggest_edges.sh", "doctor.sh", "ingest_memory.py", "apply_memory_proposal.py"],
+      "hooks": ["pre-read-check", "pre-modify-check", "post-tool-use", "session-end"]
+    },
+    "synapse-timeline": {
+      "version": "1.0.0",
+      "path": "skills/synapse-timeline/",
+      "package": "synapse-timeline.skill",
+      "size_kb": 5.5,
+      "description": "Read-only timeline and open issues query. Parses Change Log and Open Issues from memory nodes with rich filtering by tag, date, and node.",
+      "triggers": ["最近改了啥", "有哪些 open issues", "进度怎么样了", "XX 模块最近的变化"],
+      "scripts": ["query_timeline.sh"]
+    },
+    "synapse-daily-note": {
+      "version": "1.0.0",
+      "path": "skills/synapse-daily-note/",
+      "package": "synapse-daily-note.skill",
+      "size_kb": 26,
+      "description": "One-command NL-to-memory pipeline. Five stages: ingest (NL→JSON), suggest edges, interactive confirm, apply to meta/*.md, rebuild MAP, doctor validation.",
+      "triggers": ["记录一下", "记一条记忆", "今天做了什么", "log this change"],
+      "scripts": ["synapse_note.sh", "ingest_memory.py", "suggest_edges.sh", "apply_memory_proposal.py", "generate_memory_map.sh", "doctor.sh"]
+    },
+    "synapse-init": {
+      "version": "1.0.0",
+      "path": "skills/synapse-init/",
+      "package": "synapse-init.skill",
+      "size_kb": 43,
+      "description": "Cold-start wizard. Auto-detects tech stack, infers module boundaries from src/ structure, generates skeleton nodes, copies helper scripts, and registers Claude Code hooks.",
+      "triggers": ["初始化记忆", "给项目配 Synapse", "setup memory", "bootstrap memory graph"],
+      "scripts": ["init.sh", "generate_memory_map.sh", "suggest_edges.sh", "ingest_memory.py", "apply_memory_proposal.py", "doctor.sh"],
+      "hooks": ["pre-read-check", "pre-modify-check", "post-tool-use", "session-end"]
+    }
+  },
+  "compatibility": {
+    "bash": "4.0+",
+    "python": "3.8+",
+    "python_deps": "stdlib only (json, re, sys, datetime, pathlib)",
+    "os": ["linux", "macos", "windows-wsl"],
+    "claude_code": "any"
+  },
+  "eval_results": {
+    "model": "deepseek-v4-pro",
+    "fixture": "solo-saas (8 nodes)",
+    "evals_run": 2,
+    "mean_files_read": {
+      "with_skill": 8.0,
+      "without_skill": 13.0,
+      "delta_pct": -38.5
+    },
+    "mean_irrelevant_files": {
+      "with_skill": 0.0,
+      "without_skill": 4.5
+    },
+    "assertion_pass_rate": {
+      "with_skill": 1.0,
+      "without_skill": 0.625
+    },
+    "report": "EVAL_REPORT.md"
+  },
+  "breaking_changes": [],
+  "known_issues": [
+    "Full 8-eval suite not yet run (2 of 8 completed)",
+    "Token savings only visible at 30+ module scale — 8-node fixture too small to demonstrate"
+  ],
+  "next": [
+    "Complete 8-eval suite for synapse-graph-memory",
+    "Run evals for synapse-timeline, synapse-daily-note, synapse-init",
+    "Test with Claude Opus and Claude Sonnet models",
+    "Consider merging 4 skills into one /synapse parent skill with internal routing"
+  ]
+}

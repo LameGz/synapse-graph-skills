@@ -1,0 +1,92 @@
+name: Package and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.2.0)'
+        required: true
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package .skill files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Package skills
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          VERSION_CLEAN="${VERSION#v}"
+          echo "Packaging skills for version $VERSION_CLEAN"
+
+          for skill_dir in skills/synapse-*/; do
+            skill_name=$(basename "$skill_dir")
+            echo "  Packaging $skill_name"
+
+            # Create .skill archive (zip format)
+            cd "$skill_dir"
+            zip -r "../../${skill_name}-${VERSION_CLEAN}.skill" . \
+              -x "*.pyc" "*__pycache__*" ".DS_Store"
+            cd - > /dev/null
+
+            echo "  Created ${skill_name}-${VERSION_CLEAN}.skill"
+          done
+
+          ls -lh *.skill
+
+      - name: Generate release advisory
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          python3 -c "
+          import json
+          advisory = {
+            'version': '$VERSION',
+            'release_date': '$(date +%Y-%m-%d)',
+            'skills': {
+              'synapse-graph-memory': {'path': 'skills/synapse-graph-memory/', 'description': 'Core graph memory retrieval protocol — partitioned context loading with progressive disclosure'},
+              'synapse-timeline': {'path': 'skills/synapse-timeline/', 'description': 'Read-only timeline and progress queries — parse Change Log and Open Issues from memory nodes'},
+              'synapse-daily-note': {'path': 'skills/synapse-daily-note/', 'description': 'One-command NL-to-memory pipeline — ingest, suggest edges, apply, rebuild MAP, validate'},
+              'synapse-init': {'path': 'skills/synapse-init/', 'description': 'Cold-start wizard — detect stack, infer modules, generate skeleton nodes, register hooks'}
+            },
+            'compatibility': {
+              'bash': '4+',
+              'python': '3.8+',
+              'os': ['linux', 'macos', 'windows-wsl']
+            }
+          }
+          with open('release-advisory.json', 'w') as f:
+              json.dump(advisory, f, indent=2, ensure_ascii=False)
+          print('Generated release-advisory.json')
+          "
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Synapse Graph Skills ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: |
+            *.skill
+            release-advisory.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

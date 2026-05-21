@@ -1,0 +1,198 @@
+{
+  "skill_name": "synapse-graph-memory",
+  "test_fixture": "f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+  "evals": [
+    {
+      "id": 1,
+      "name": "status-query-specific-module",
+      "prompt": "登录功能做得怎么样了？我上次改了什么？项目在 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas 目录下，里面有 MEMORY_MAP.md 和 meta/ 目录。帮我用 synapse-graph-memory skill 查询一下。",
+      "expected_output": "Agent reads MEMORY_MAP.md first, finds feat_login in Tag Index, loads meta/feat_login.md, reports status (in-progress) and last Change Log entry (2026-05-11: Natural-language memory ingestion)",
+      "assertions": [
+        {
+          "name": "reads-map-before-node",
+          "description": "Agent reads MEMORY_MAP.md before reading any meta/*.md file",
+          "check": "order_check",
+          "expected": ["MEMORY_MAP.md", "meta/feat_login.md"]
+        },
+        {
+          "name": "finds-correct-node",
+          "description": "Agent identifies feat_login as the target node",
+          "check": "content_contains",
+          "expected": "feat_login"
+        },
+        {
+          "name": "reports-correct-status",
+          "description": "Agent reports feat_login is in-progress",
+          "check": "content_contains",
+          "expected": "in-progress"
+        },
+        {
+          "name": "reports-last-change",
+          "description": "Agent surfaces the last Change Log entry date",
+          "check": "content_contains",
+          "expected": "2026-05-11"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "pending-work-query",
+      "prompt": "看看项目还有什么没做完的？项目路径：f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+      "expected_output": "Agent reads MEMORY_MAP.md Progress Summary section only (~300 tokens), reports that 3 nodes are in-progress (feat_login, feat_subscription, feat_admin-notification), 5 are stable, 0 open issues. Suggests in-progress nodes as focus candidates.",
+      "assertions": [
+        {
+          "name": "reads-progress-summary-only",
+          "description": "Agent reads Progress Summary without loading node files",
+          "check": "order_check",
+          "expected": ["MEMORY_MAP.md", "Progress Summary"]
+        },
+        {
+          "name": "reports-correct-counts",
+          "description": "Agent reports 3 in-progress, 5 stable nodes",
+          "check": "content_contains",
+          "expected": "3"
+        },
+        {
+          "name": "does-not-load-nodes",
+          "description": "Agent stops at MAP level, doesn't load individual nodes for vague query",
+          "check": "must_not_read",
+          "expected": "meta/feat_login.md"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "cross-module-impact-check",
+      "prompt": "我要改 mod_user-account 的用户套餐字段，会影响哪些功能？项目在 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+      "expected_output": "Agent reads MEMORY_MAP.md, finds mod_user-account, checks its blocks field. Reports that feat_subscription and feat_admin-notification both depend on mod_user-account. Agent then reads Connection Points from those blocking nodes to assess impact.",
+      "assertions": [
+        {
+          "name": "checks-blocks-before-modify",
+          "description": "Agent reads blocks field from MEMORY_MAP for mod_user-account",
+          "check": "content_contains",
+          "expected": "blocks"
+        },
+        {
+          "name": "identifies-downstream-consumers",
+          "description": "Agent identifies feat_subscription and feat_admin-notification as dependents",
+          "check": "content_contains",
+          "expected": "feat_subscription"
+        },
+        {
+          "name": "identifies-second-downstream",
+          "description": "Agent also identifies feat_admin-notification",
+          "check": "content_contains",
+          "expected": "feat_admin-notification"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "keyword-fallback-query",
+      "prompt": "关于 /api/v1/auth/refresh 这个接口，项目里有哪些记忆节点记录过它？项目路径：f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+      "expected_output": "Agent reads MEMORY_MAP.md, doesn't find tag match for 'refresh', falls back to Keyword Index, finds /api/v1/auth/refresh → mod_auth-api. Loads mod_auth-api and reports the endpoint info.",
+      "assertions": [
+        {
+          "name": "uses-keyword-index-fallback",
+          "description": "Agent uses Keyword Index when tag match fails",
+          "check": "content_contains",
+          "expected": "Keyword"
+        },
+        {
+          "name": "finds-correct-node-via-keyword",
+          "description": "Agent finds mod_auth-api via keyword index",
+          "check": "content_contains",
+          "expected": "mod_auth-api"
+        },
+        {
+          "name": "reports-endpoint-details",
+          "description": "Agent reports concrete endpoint details from the node",
+          "check": "content_contains",
+          "expected": "/api/v1/auth/refresh"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "compound-time-domain-query",
+      "prompt": "最近两天订阅支付相关的改了什么？项目路径：f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+      "expected_output": "Agent performs Filtered BFS: tag='subscription'/'payment' + date filter (recent 2 days from the MEMORY_MAP Change Log Index). Reports Change Log entries from feat_subscription, mod_payment, mod_user-account (all dated 2026-05-12).",
+      "assertions": [
+        {
+          "name": "uses-filtered-bfs",
+          "description": "Agent decomposes query into tag + date dimensions",
+          "check": "content_contains",
+          "expected": "2026-05-12"
+        },
+        {
+          "name": "finds-subscription-nodes",
+          "description": "Agent finds subscription/payment related nodes",
+          "check": "content_contains",
+          "expected": "feat_subscription"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "alias-match-query",
+      "prompt": "关于会员套餐的功能，项目里记录了哪些内容？项目路径：f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+      "expected_output": "Agent reads MEMORY_MAP.md, tries tag matching with '会员'/'套餐' — finds matches in Tag Index via Chinese aliases (mod_user-account has alias '会员, 套餐', feat_subscription has alias '订阅, 会员, 套餐'). Reports both nodes.",
+      "assertions": [
+        {
+          "name": "matches-chinese-aliases",
+          "description": "Agent finds nodes via Chinese alias matching",
+          "check": "content_contains",
+          "expected": "mod_user-account"
+        },
+        {
+          "name": "finds-subscription-via-alias",
+          "description": "Agent also finds feat_subscription via alias",
+          "check": "content_contains",
+          "expected": "feat_subscription"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "should-not-trigger-generic-coding",
+      "prompt": "帮我写一个 Python 函数，计算斐波那契数列的前 N 项",
+      "expected_output": "Agent does NOT trigger the skill. No memory retrieval needed for a generic coding task.",
+      "assertions": [
+        {
+          "name": "no-memory-map-read",
+          "description": "Agent does not read MEMORY_MAP.md",
+          "check": "must_not_read",
+          "expected": "MEMORY_MAP.md"
+        },
+        {
+          "name": "no-meta-node-read",
+          "description": "Agent does not read any meta/*.md files",
+          "check": "must_not_read_glob",
+          "expected": "meta/*.md"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "name": "should-not-trigger-git-query",
+      "prompt": "帮我看看最近的 git 提交记录，项目在 f:/大模型项目/Synapse/Synapse-Solo/examples/solo-saas",
+      "expected_output": "Agent does NOT trigger the skill. git log is a git command, not a memory query.",
+      "assertions": [
+        {
+          "name": "no-memory-map-read-for-git",
+          "description": "Agent uses git commands, not memory retrieval",
+          "check": "must_not_read",
+          "expected": "MEMORY_MAP.md"
+        }
+      ],
+      "files": []
+    }
+  ]
+}

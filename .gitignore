@@ -1,0 +1,41 @@
+# Synapse runtime
+.memory/
+MEMORY_MAP.md
+MEMORY_MAP.json
+meta/
+.synapse-proposal.json
+.synapse-cache/
+.synapse-*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Shell
+*.log
+
+# Skill packaging artifacts
+*.skill
+!skills/*.skill
+
+# Test artifacts
+*-workspace/
+!tests/fixtures/*-workspace/
+
+# Node
+node_modules/

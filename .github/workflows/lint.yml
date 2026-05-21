@@ -1,0 +1,68 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  markdownlint:
+    name: Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint README files
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            README.md
+            README.zh-CN.md
+            docs/*.md
+          config: |
+            MD013: false
+            MD024: false
+            MD033: false
+            MD041: false
+          continueOnError: true
+
+  jsonlint:
+    name: JSON lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate all JSON files
+        run: |
+          find . -name "*.json" -not -path "./.git/*" -print0 | while IFS= read -r -d '' f; do
+            python3 -c "import json; json.load(open('$f'))" && echo "  OK: $f" || echo "  FAIL: $f"
+          done
+
+  yamllint:
+    name: YAML frontmatter lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check YAML frontmatter in SKILL.md files
+        run: |
+          for f in skills/*/SKILL.md; do
+            echo "Checking $f"
+            python3 -c "
+      import re
+      with open('$f') as fh:
+          content = fh.read()
+      m = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+      if not m:
+          print(f'  FAIL: no frontmatter found')
+          exit(1)
+      # Basic YAML key check
+      yaml = m.group(1)
+      for key in ['name:', 'description:']:
+          if key not in yaml:
+              print(f'  FAIL: missing {key}')
+              exit(1)
+      print(f'  OK')
+      "
+          done

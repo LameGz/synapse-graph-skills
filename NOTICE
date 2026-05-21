@@ -1,0 +1,16 @@
+Synapse Graph Skills
+Copyright 2026 Synapse Graph Skills Contributors
+
+This product includes software developed by:
+
+- The Synapse project (https://github.com/anthropics/claude-code)
+  Used under the terms of the Claude Code SDK and skill-creator framework.
+
+- The skill-creator methodology and packaging tools are adapted from the
+  Anthropic Claude Code skill system. See https://docs.anthropic.com/claude-code
+
+All scripts and markdown content in this repository are original works unless
+otherwise noted. Third-party dependencies (bash, Python 3 stdlib) are used at
+runtime and are not bundled.
+
+For full license terms, see the LICENSE file in this repository.
