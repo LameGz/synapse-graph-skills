@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell(if \\(-not \\(Test-Path \"f:\\\\大模型项目\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts\"\\)\\) { New-Item -ItemType Directory -Force -Path \"f:\\\\大模型项目\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts\" }; \"Directory ready\")",
+      "PowerShell(python \"f:\\\\��ģ����Ŀ\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts\\\\auto_observe.py\" --project \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\auto-test\" --transcript \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt\" --min-confidence 0)",
+      "PowerShell(Get-Command python3 -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command python -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command py -ErrorAction SilentlyContinue)",
+      "PowerShell(py \"f:\\\\��ģ����Ŀ\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts\\\\auto_observe.py\" --project \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\auto-test\" --transcript \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt\" --min-confidence 0)",
+      "Read(//f/��ģ����Ŀ/synapse-graph-skills/synapse-graph-memory/scripts/**)",
+      "PowerShell(& py $script --project $project --transcript $transcript --min-confidence 0 2>&1)",
+      "PowerShell($script = \"f:\\\\��ģ����Ŀ\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts\\\\auto_observe.py\")",
+      "PowerShell($project = \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\auto-test\")",
+      "PowerShell($transcript = \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt\")",
+      "PowerShell(& py $script --project $project --transcript $transcript --min-confidence 0)",
+      "PowerShell(& py \"f:\\\\��ģ����Ŀ\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts\\\\auto_observe.py\" --help)",
+      "PowerShell(& py -c \"import sys; sys.path.insert\\(0, r'f:\\\\��ģ����Ŀ\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts'\\); import auto_observe; print\\('import OK'\\)\")",
+      "PowerShell(& py -c \"import sys; sys.argv = ['auto_observe.py', '--project', r'C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\auto-test', '--transcript', r'C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt', '--min-confidence', '0']; sys.path.insert\\(0, r'f:\\\\��ģ����Ŀ\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts'\\); import auto_observe; auto_observe.main\\(\\)\")",
+      "PowerShell($env:PYTHONIOENCODING = 'utf-8'; & py -c \"import sys; sys.argv = ['auto_observe.py', '--project', r'C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\auto-test', '--transcript', r'C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt', '--min-confidence', '0']; sys.path.insert\\(0, r'f:\\\\大模型项目\\\\synapse-graph-skills\\\\synapse-graph-memory\\\\scripts'\\); import auto_observe; auto_observe.main\\(\\)\")",
+      "PowerShell(Get-Content -Encoding UTF8 \"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt\"; $fileContent = [System.IO.File]::ReadAllText\\(\"C:\\\\Users\\\\hasee\\\\AppData\\\\Local\\\\Temp\\\\convo.txt\", [System.Text.Encoding]::UTF8\\); \"File length: $\\($fileContent.Length\\)\"; \"Content: [$fileContent]\")",
+      "Bash(cp synapse-graph-memory/scripts/auto_observe.py synapse-daily-note/scripts/auto_observe.py)",
+      "Bash(cp synapse-graph-memory/scripts/auto_observe.py synapse-init/scripts/auto_observe.py)",
+      "Bash(cp synapse-graph-memory/scripts/synapse_note.sh synapse-daily-note/scripts/synapse_note.sh)",
+      "Bash(cp synapse-graph-memory/scripts/hooks/session-end.sh synapse-daily-note/scripts/hooks/session-end.sh)",
+      "Bash(cp synapse-graph-memory/scripts/hooks/session-end.sh synapse-init/scripts/hooks/session-end.sh)",
+      "Bash(cp -r \"f:/大模型项目/synapse-graph-skills/synapse-graph-memory/scripts\" ./)",
+      "Bash(mkdir -p scripts/hooks)",
+      "Bash(bash scripts/generate_memory_map.sh --full)",
+      "Bash(python scripts/auto_observe.py --project . --min-confidence 0)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Proposals: {d[\\\\\"count\\\\\"]}'\\); [print\\(f'  [{p[\\\\\"confidence\\\\\"]}%] {p[\\\\\"change_type\\\\\"]}: {p.get\\(\\\\\"content\\\\\",\\\\\"\\\\\"\\)[:80]}'\\) for p in d['proposals']]\")",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(where python *)",
+      "Bash(py --version)",
+      "Bash(py -3 --version)",
+      "Bash(py -3 scripts/auto_observe.py --project . --min-confidence 0)",
+      "Bash(py -3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Proposals: {d[\\\\\"count\\\\\"]}'\\); [print\\(f'  [{p[\\\\\"confidence\\\\\"]}%] {p[\\\\\"change_type\\\\\"]}: {p.get\\(\\\\\"content\\\\\",\\\\\"\\\\\"\\)[:80]}'\\) for p in d['proposals']]\")"
+    ]
+  }
+}
