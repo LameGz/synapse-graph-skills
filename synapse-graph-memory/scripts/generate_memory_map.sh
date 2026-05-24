@@ -19,6 +19,8 @@ fi
 FULL_REBUILD=false
 CHANGED_FILE=""
 STATS_MODE=false
+USE_DB=false
+DB_PATH=""
 PROJECT_ROOT_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -33,6 +35,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --stats) STATS_MODE=true; shift ;;
+    --db) USE_DB=true; DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -50,6 +53,11 @@ fi
 META_DIR="${PROJECT_ROOT}/meta"
 OUTPUT="${PROJECT_ROOT}/MEMORY_MAP.md"
 CACHE_DIR="${PROJECT_ROOT}/.claude/.synapse_cache"
+
+# Set DB_PATH after PROJECT_ROOT is resolved
+if [ "$USE_DB" = true ]; then
+  DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"
+fi
 
 mkdir -p "$CACHE_DIR"
 
@@ -1047,6 +1055,29 @@ to_json_changelog() {
 
 echo "MEMORY_MAP.md regenerated: ${#ALL_NODES[@]} nodes, ${#TAG_MAP[@]} tags, ${#KEYWORD_MAP[@]} keywords, ${#CHANGELOG_INDEX[@]} change-log months, $warnings warnings."
 echo "MEMORY_MAP.json regenerated: ${#ALL_NODES[@]} nodes."
+
+# ─── SQLite cache sync ──────────────────────────────────────────────────
+if [ "$USE_DB" = true ] && [ -n "$DB_PATH" ] && command -v python3 >/dev/null 2>&1; then
+  DB_INIT_SCRIPT="${SCRIPT_DIR}/db_init.py"
+  DB_INDEX_SCRIPT="${SCRIPT_DIR}/db_index.py"
+
+  if [ -f "$DB_INDEX_SCRIPT" ]; then
+    # Ensure DB exists
+    if [ ! -f "$DB_PATH" ]; then
+      python3 "$DB_INIT_SCRIPT" --db "$DB_PATH" 2>&1 || true
+    fi
+
+    # Incremental or full sync
+    if [ "$FULL_REBUILD" = true ]; then
+      python3 "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --full 2>&1
+    elif [ -n "$CHANGED_FILE" ]; then
+      node_id=$(basename "$CHANGED_FILE" .md)
+      python3 "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --changed "$node_id" 2>&1
+    else
+      python3 "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" 2>&1
+    fi
+  fi
+fi
 
 # ─── Stats output (--stats mode) ───────────────────────────────────────
 if [ "$STATS_MODE" = true ]; then
