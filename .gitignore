@@ -5,6 +5,7 @@ MEMORY_MAP.json
 meta/
 .synapse-proposal.json
 .synapse-cache/
+.synapse/cache/
 .synapse-*
 
 # Python
