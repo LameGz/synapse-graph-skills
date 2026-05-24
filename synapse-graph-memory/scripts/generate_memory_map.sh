@@ -71,12 +71,6 @@ if [ "$USE_DB" = true ]; then
   DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"
 fi
 
-# ─── Link-trace dispatch ──────────────────────────────────────────────
-if [ -n "${TRACE_FROM:-}" ] && [ -n "${TRAVERSE_TYPES:-}" ]; then
-  bfs_trace "$TRACE_FROM" "$TRAVERSE_TYPES" "${TRACE_DEPTH:-4}" "${TRACE_WIDTH:-3}"
-  exit $?
-fi
-
 mkdir -p "$CACHE_DIR"
 
 if [ ! -d "$META_DIR" ]; then
@@ -309,6 +303,12 @@ else:
     }, ensure_ascii=False))
 " 2>&1
 }
+
+# ─── Link-trace dispatch ──────────────────────────────────────────────
+if [ -n "${TRACE_FROM:-}" ] && [ -n "${TRAVERSE_TYPES:-}" ]; then
+  bfs_trace "$TRACE_FROM" "$TRAVERSE_TYPES" "${TRACE_DEPTH:-4}" "${TRACE_WIDTH:-3}"
+  exit $?
+fi
 
 # ─── Cache helpers ─────────────────────────────────────────────────────
 # Cache key: sanitized relative path (replace / with _)
