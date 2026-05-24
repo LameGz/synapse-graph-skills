@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# watch.sh — Polling-based staleness detection for Synapse memory nodes.
+# Scans source files for changes and marks referencing meta/ nodes as stale.
+#
+# Usage:
+#   watch.sh --project <root> [--once] [--interval 30]
+
+set -euo pipefail
+
+PROJECT_ROOT=""
+ONCE=false
+INTERVAL=30
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project) PROJECT_ROOT="$2"; shift 2 ;;
+    --once) ONCE=true; shift ;;
+    --interval) INTERVAL="$2"; shift 2 ;;
+    *) echo "Unknown: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [ -z "$PROJECT_ROOT" ]; then
+  echo "Error: --project required" >&2
+  exit 1
+fi
+
+DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"
+STALE_MAP="${PROJECT_ROOT}/.claude/.synapse_cache/.stale_map"
+
+check_staleness() {
+  if [ ! -f "$DB_PATH" ] || ! command -v python3 >/dev/null 2>&1; then
+    echo "SQLite cache not found. Run generate_memory_map.sh --db first."
+    return
+  fi
+
+  python3 -c "
+import json, os, sqlite3, sys
+
+conn = sqlite3.connect('${DB_PATH}')
+stale_map_file = '${STALE_MAP}'
+
+prev_hashes = {}
+if os.path.exists(stale_map_file):
+    try:
+        with open(stale_map_file) as f:
+            prev_hashes = json.load(f)
+    except json.JSONDecodeError:
+        pass
+
+nodes = conn.execute('SELECT id, file_path, updated FROM nodes').fetchall()
+
+new_hashes = {}
+new_stale = []
+
+for node_id, file_path, updated in nodes:
+    if not file_path:
+        continue
+    full_path = os.path.join('${PROJECT_ROOT}', file_path)
+    if not os.path.exists(full_path):
+        continue
+    try:
+        mtime = os.path.getmtime(full_path)
+        size = os.path.getsize(full_path)
+        file_hash = f'{mtime}:{size}'
+    except OSError:
+        continue
+    new_hashes[file_path] = file_hash
+    if file_path in prev_hashes and prev_hashes[file_path] != file_hash:
+        new_stale.append((node_id, file_path, updated))
+
+conn.execute('DELETE FROM staleness')
+for node_id, file_path, updated in new_stale:
+    conn.execute('''
+        INSERT OR REPLACE INTO staleness (node_id, stale_since, reason, affected_refs)
+        VALUES (?, date(\"now\"), ?, ?)
+    ''', (node_id, f'source changed: {file_path}', json.dumps([file_path])))
+
+conn.commit()
+stale_count = conn.execute('SELECT COUNT(*) FROM staleness').fetchone()[0]
+conn.close()
+
+with open(stale_map_file, 'w') as f:
+    json.dump(new_hashes, f)
+
+if stale_count > 0:
+    print(f'STALE: {stale_count} node(s) flagged for review')
+    for node_id, file_path, _ in new_stale:
+        print(f'  {node_id} — source changed: {file_path}')
+else:
+    print('All memory nodes up-to-date.')
+" 2>&1
+}
+
+if $ONCE; then
+  check_staleness
+  exit 0
+fi
+
+echo "Watching for source changes (interval: ${INTERVAL}s)..."
+trap 'echo ""; echo "Watch stopped."; exit 0' INT TERM
+
+while true; do
+  check_staleness
+  sleep "$INTERVAL"
+done
