@@ -24,6 +24,16 @@ fi
 META_DIR="${PROJECT_ROOT}/meta"
 MAP_SCRIPT="${SCRIPT_DIR}/generate_memory_map.sh"
 
+FULLSTACK=false
+
+# Argument parsing
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fullstack) FULLSTACK=true; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
 echo "🧠 Synapse Cold-Start Wizard"
 echo "   Project: $PROJECT_ROOT"
 echo ""
@@ -238,6 +248,260 @@ else
   echo "   Skipping (source_scan.py not found or python3 unavailable)"
 fi
 echo ""
+
+# ─── Full-Stack Mode: 4-layer scanning ──────────────────────────────────
+if $FULLSTACK; then
+  echo ""
+  echo "─── Full-Stack Scan ───"
+
+  # Layer 1: Database Schema
+  echo ""
+  echo "Layer 1/4: Database schema..."
+  PRISMA_SCHEMA="${PROJECT_ROOT}/prisma/schema.prisma"
+  if [ -f "$PRISMA_SCHEMA" ] && command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import os, re
+project = '${PROJECT_ROOT}'
+meta_dir = os.path.join(project, 'meta')
+os.makedirs(meta_dir, exist_ok=True)
+with open('${PRISMA_SCHEMA}') as f:
+    content = f.read()
+models = re.findall(r'model\s+(\w+)\s*\{', content)
+for model_name in models:
+    field_re = re.compile(rf'model\s+{model_name}\s*\{{(.*?)\}}', re.DOTALL)
+    field_match = field_re.search(content)
+    fields_text = field_match.group(1) if field_match else ''
+    cols = re.findall(r'^\s*(\w+)\s+(\w+(?:\[\])?)\s*(@\w+(?:\([^)]*\))?)?', fields_text, re.MULTILINE)
+    skeleton_cols = [c for c in cols if c[0] in ('id',) or 'Id' in c[0] or 'status' in c[0].lower() or 'type' in c[0].lower() or 'amount' in c[0].lower() or c[2] != '']
+    col_table = '| 列名 | 类型 | 约束 |\n|------|------|------|\n'
+    for name, typ, attr in skeleton_cols[:8]:
+        attr_str = attr.replace('@', '').replace('_', ' ') if attr else '-'
+        col_table += f'| {name} | {typ} | {attr_str} |\n'
+    if len(cols) > len(skeleton_cols[:8]):
+        col_table += f'| ... | ... | (省略 {len(cols) - len(skeleton_cols[:8])} 个辅助字段) |\n'
+    node_file = os.path.join(meta_dir, f'db_{model_name.lower()}.md')
+    if not os.path.exists(node_file):
+        with open(node_file, 'w', encoding='utf-8') as out:
+            out.write(f'''---
+id: db_{model_name.lower()}
+type: database_table
+engine: auto-detected
+depends_on: []
+auto_linked: []
+tags: [{model_name.lower()}]
+aliases: [{model_name}]
+summary: {model_name} 表 — auto-detected from Prisma schema
+---
+
+# db_{model_name.lower()}
+
+## Columns (仅业务骨架字段)
+{col_table}
+## Connection Points
+<!-- 待补充: suggest_edges.sh 或手动填写 -->
+
+## Change Log
+- $(date +%Y-%m-%d): Auto-detected from Prisma schema (init.sh --fullstack)
+''')
+        print(f'  + db_{model_name.lower()}')
+" 2>&1
+  else
+    echo "  (no prisma/schema.prisma found or python3 unavailable)"
+  fi
+
+  # Layer 2: API Routes
+  echo ""
+  echo "Layer 2/4: API routes..."
+  if [ -f "${SCRIPT_DIR}/source_scan.py" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/source_scan.py" --project "$PROJECT_ROOT" --scan-depth 3 --json 2>/dev/null | python3 -c "
+import json, os, sys
+try:
+    data = json.load(sys.stdin)
+except json.JSONDecodeError:
+    print('  (no source files with detectable interfaces)')
+    sys.exit(0)
+project = '${PROJECT_ROOT}'
+meta_dir = os.path.join(project, 'meta')
+os.makedirs(meta_dir, exist_ok=True)
+router_groups = {}
+for filepath, symbols in data.items():
+    dirname = os.path.dirname(filepath) or 'root'
+    if dirname not in router_groups:
+        router_groups[dirname] = []
+    router_groups[dirname].extend(symbols)
+count = 0
+for dirname, symbols in list(router_groups.items())[:15]:
+    endpoints = [s for s in symbols if 'def ' in s.get('signature', '') or 'function' in s.get('signature', '') or 'func ' in s.get('signature', '')]
+    if len(endpoints) < 1:
+        continue
+    router_name = os.path.basename(dirname) or 'root'
+    node_id = f'api_{router_name}-routes'
+    node_file = os.path.join(meta_dir, f'{node_id}.md')
+    if not os.path.exists(node_file):
+        ep_table = '| 方法 | 路径 | 状态 |\n|------|------|------|\n'
+        for ep in endpoints[:10]:
+            ep_table += f'| ? | ? | unknown |\n'
+        with open(node_file, 'w', encoding='utf-8') as out:
+            out.write(f'''---
+id: {node_id}
+type: api_endpoint_group
+framework: auto-detected
+source: {dirname}
+depends_on: []
+auto_linked: []
+tags: [api]
+summary: API routes in {dirname} — auto-detected ({len(endpoints)} endpoints)
+---
+
+# {node_id}
+
+## Endpoints
+{ep_table}
+## Connection Points
+<!-- 待补充 -->
+
+## Change Log
+- $(date +%Y-%m-%d): Auto-detected (init.sh --fullstack)
+''')
+        print(f'  + {node_id}')
+        count += 1
+if count == 0:
+    print('  (no API route files detected)')
+" 2>&1
+  else
+    echo "  (source_scan.py not available, skipping API detection)"
+  fi
+
+  # Layer 3: UI Pages
+  echo ""
+  echo "Layer 3/4: UI pages (skeleton only)..."
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import os
+project = '${PROJECT_ROOT}'
+meta_dir = os.path.join(project, 'meta')
+os.makedirs(meta_dir, exist_ok=True)
+page_patterns = [
+    ('src/pages', 'react'),
+    ('src/views', 'vue'),
+    ('app', 'nextjs'),
+    ('src/routes', 'sveltekit'),
+]
+count = 0
+for base_dir, framework in page_patterns:
+    full_dir = os.path.join(project, base_dir)
+    if not os.path.isdir(full_dir):
+        continue
+    for root, dirs, files in os.walk(full_dir):
+        depth = len(os.path.relpath(root, full_dir).split(os.sep))
+        rel = os.path.relpath(root, full_dir)
+        if rel == '.':
+            depth = 0
+        if depth > 2:
+            dirs.clear()
+            continue
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', '__tests__', 'api', 'components', 'hooks', 'utils')]
+        page_files = [f for f in files if f.endswith(('.tsx', '.jsx', '.vue', '.svelte')) and not f.startswith('_') and 'test' not in f.lower()]
+        if page_files:
+            page_name = rel.replace('/', '-').replace('.', '-') or 'index'
+            node_id = f'ui_{page_name}-page'
+            node_file = os.path.join(meta_dir, f'{node_id}.md')
+            if not os.path.exists(node_file):
+                with open(node_file, 'w', encoding='utf-8') as out:
+                    out.write(f'''---
+id: {node_id}
+type: ui_page
+framework: {framework}
+source: {base_dir}/{rel}
+depends_on: []
+auto_linked: []
+tags: [ui]
+summary: {page_name} page — auto-detected, {len(page_files)} component(s)
+---
+
+# {node_id}
+
+## States
+<!-- 待补充 -->
+
+## API 调用
+<!-- 待补充: suggest_edges.sh 或手动填写 -->
+
+## Change Log
+- $(date +%Y-%m-%d): Auto-detected (init.sh --fullstack)
+''')
+            print(f'  + {node_id} ({framework})')
+            count += 1
+        # Only take one level per base_dir
+        dirs.clear()
+if count == 0:
+    print('  (no UI page files detected)')
+" 2>&1
+  else
+    echo "  (python3 unavailable, skipping UI detection)"
+  fi
+
+  # Layer 4: Deployment
+  echo ""
+  echo "Layer 4/4: Deployment config..."
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import os, re
+project = '${PROJECT_ROOT}'
+meta_dir = os.path.join(project, 'meta')
+os.makedirs(meta_dir, exist_ok=True)
+
+dockerfiles = [f for f in os.listdir(project) if f.startswith('Dockerfile') or f.startswith('docker-compose')]
+if dockerfiles:
+    node_id = 'dep_container-config'
+    node_file = os.path.join(meta_dir, f'{node_id}.md')
+    if not os.path.exists(node_file):
+        env_vars = []
+        env_example = os.path.join(project, '.env.example')
+        if os.path.exists(env_example):
+            with open(env_example, encoding='utf-8-sig', errors='replace') as f:
+                for line in f:
+                    m = re.match(r'^(\w+)=', line.strip())
+                    if m:
+                        comment = line.split('#')[-1].strip() if '#' in line else ''
+                        env_vars.append((m.group(1), comment[:60]))
+        bridges = '| 变量 | 连接 | 说明 |\n|------|------|------|\n'
+        for var, desc in env_vars[:10]:
+            bridges += f'| {var} | ? | {desc} |\n'
+        if not env_vars:
+            bridges = '<!-- 未检测到 .env.example -->\n'
+        with open(node_file, 'w', encoding='utf-8') as out:
+            out.write(f'''---
+id: {node_id}
+type: deployment
+depends_on: []
+auto_linked: []
+tags: [docker, deploy]
+summary: Container config: {\", \".join(dockerfiles)} — auto-detected
+---
+
+# {node_id}
+
+## Files
+{chr(10).join(\"- \" + f for f in dockerfiles)}
+
+## Environment Bridges
+{bridges}
+## Change Log
+- $(date +%Y-%m-%d): Auto-detected (init.sh --fullstack)
+''')
+        print(f'  + {node_id} ({len(dockerfiles)} file(s))')
+else:
+    print('  (no Docker files found)')
+" 2>&1
+  else
+    echo "  (python3 unavailable, skipping deployment detection)"
+  fi
+
+  echo ""
+  echo "Full-stack scan complete. Skeleton nodes generated in meta/"
+  echo "Next: review skeletons, run suggest_edges.sh, use daily-note to fill details"
+fi
 
 # ─── Step 4: Generate mod_project.md ───────────────────────────────────
 echo "📝 Generating nodes..."
