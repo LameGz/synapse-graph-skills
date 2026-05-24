@@ -146,7 +146,12 @@ if [ "$YES" -ne 1 ]; then
 fi
 
 python "$SCRIPT_DIR/apply_memory_proposal.py" --project "$PROJECT_ABS" --proposal "$PROPOSAL" --edge-mode "$EDGE_MODE"
-bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$PROJECT_ABS" --full
+# Incremental MAP update: only re-index the modified node
+if [ "$TARGET_NODE" != "unknown" ] && [ -f "${PROJECT_ABS}/meta/${TARGET_NODE}.md" ]; then
+  bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$PROJECT_ABS" --changed "${TARGET_NODE}.md"
+else
+  bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$PROJECT_ABS" --full
+fi
 doctor_output="$(bash "$SCRIPT_DIR/doctor.sh" --project "$PROJECT_ABS")"
 echo "$doctor_output"
 
