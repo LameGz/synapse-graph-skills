@@ -42,6 +42,7 @@ When the user's message matches ANY of these, execute the Retrieval Protocol bef
 | "XX 有什么问题" / "关于 XX..." | Find XX → load node → check Open Issues section |
 | "做到什么程度了" / "还有多少没做完" / "接下来做什么" | Read Progress Summary only (~300 tok) |
 | "今天/最近 XX 改了什么" | Filtered BFS: tag match + date filter on Change Log |
+| "XX 链路怎么通的" / "这个按钮经过了哪些接口" / "从前端到数据库的完整路径" | Link Trace: bfs_trace() with --traverse-types ui,api,db,dep |
 
 **Keyword extraction**: Tech terms first (FastAPI → `api`, React → `frontend`). Module names direct (登录 → `auth, login`). If no keyword extracted AND no tag matches → Status Digest mode (read only, don't guess).
 
@@ -56,6 +57,7 @@ When the user's message matches ANY of these, execute the Retrieval Protocol bef
 | Trivial change | "登录按钮改个颜色" | Progressive BFS (shallow) | MAP → target node only |
 | Compound query | "今天前端改了啥" | Filtered BFS | Tag + date + section decomposition |
 | Tag miss | "那个 token 刷新的事" | Keyword fallback | MAP keyword index → target node |
+| Link trace | "支付链路怎么通的" | bfs_trace() state machine | MAP → start node → bfs_trace(types) → terminal paths |
 
 ### Filtered BFS — Compound Query Decomposition
 
@@ -167,3 +169,36 @@ Address hook output warnings before next session.
 - `references/common-mistakes.md` — Anti-patterns table. Read when debugging retrieval failures.
 - `assets/template.md` — Copy when creating new mod_ or feat_ nodes.
 - `scripts/` — All automation scripts. Execute via bash, do NOT load into context.
+
+## Link Trace — Full-Stack Path Finding (V3.3)
+
+When the user asks how a complete chain flows through the stack:
+
+1. **Identify start node** from query (usually a ui_ or feat_ node)
+2. **Run bfs_trace**: `generate_memory_map.sh --trace-from <node_id> --traverse-types ui,api,db,dep`
+3. **Interpret results**:
+   - Non-partial paths: render as `ui_X → api_Y → db_Z → dep_W`
+   - Partial paths: include warning that chain did not reach terminal type
+4. **Report** the valid paths (up to 3) to the user
+
+### State Machine Behavior
+
+The BFS allows:
+- **Multi-hop within same type**: `ui → api_A → api_B → db` (microservice gateways)
+- **Skip-level**: `ui → api → dep` (skip db, directly to deployment)
+- **Terminal types**: last type in the sequence (default: `dep`)
+
+### Backtrack Pruning
+
+After BFS completes:
+1. Filter paths whose last node matches a terminal type
+2. Sort by length, take shortest `width` paths
+3. If zero terminal-reaching paths: degrade to partial mode with warning
+
+### Usage
+
+```bash
+bash scripts/generate_memory_map.sh --trace-from ui_checkout-page --traverse-types ui,api,db,dep
+```
+
+Returns JSON with `paths` array and `partial` flag.
