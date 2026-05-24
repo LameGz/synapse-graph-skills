@@ -202,3 +202,70 @@ bash scripts/generate_memory_map.sh --trace-from ui_checkout-page --traverse-typ
 ```
 
 Returns JSON with `paths` array and `partial` flag.
+
+## Autonomous Memory Writing (V3.4)
+
+During conversation, YOU are responsible for keeping the memory graph up to date.
+Do NOT wait for the user to say "/记录一下". Observe the conversation and act.
+
+### When to auto-write
+
+| Signal | Action | Confidence |
+|--------|--------|------------|
+| Source file changed (PostToolUse) | Record Change Log in matching meta/ node | High (~90%) |
+| User says "决定了" / "就用" / "we'll use" | Record Key Decision | High (~85%) |
+| API endpoint added/removed | Update Connection Points | High (~95%) |
+| User says "还差" / "还没" / "not yet" | Add Open Issue | Medium (~70%) |
+| New file created | Suggest new meta/ node | Medium (~60%) |
+| Long discussion on one topic (>10 msgs) | Suggest Change Log entry | Low (~50%) |
+
+### How to auto-write
+
+Use the standard pipeline — don't hand-edit nodes.
+
+```
+bash scripts/synapse_note.sh --text "..." --edge-mode auto --auto-confirm
+```
+
+The `--auto-confirm` flag skips interactive prompts. The pipeline handles:
+ingest -> suggest_edges -> apply -> rebuild MAP -> validate
+
+### Auto-write marker
+
+All auto-written entries in node files are tagged:
+```
+<!-- auto-recorded, confidence: N% -->
+```
+This lets the user audit AI-written content vs. human-written content.
+
+### Audit trail
+
+Session-end hook collects all auto-proposals, auto-applies high-confidence (>=70%)
+entries, and displays low-confidence entries for user review:
+
+```
+🧠 Synapse Session End
+
+📝 Auto-Recorded:
+  ✓ api_payment-routes: 新增 API 端点 POST /callback (95%)
+  ✓ feat_login: 响应式断点 768->640px (90%)
+
+⚠  Needs Review:
+  1. [key_decision] 决定: Redis 做支付状态缓存
+     confidence: 85% | target: mod_payment
+```
+
+### When NOT to auto-write
+
+- User explicitly says "先别记" / "don't record this"
+- The change is a WIP / experiment that may be reverted
+- You cannot determine the target node with confidence > 40%
+- The same content was already recorded in this session (dedup)
+
+### PostToolUse hook integration
+
+After writing a source file, consider: should I record this? If yes:
+1. Identify the target meta/ node from the file path
+2. Run `auto_observe.py --changed-file <path>` to get a proposal
+3. If confidence >= 70%, auto-apply immediately (don't wait for session end)
+4. If confidence < 70%, note it for session-end review
