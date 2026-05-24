@@ -168,15 +168,15 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 | Irrelevant Files | **0** | 4.5 | key win |
 | Assertion Pass Rate | **100%** | 62.5% | — |
 
-### V3.2 SQLite Performance (30-node fixture, local)
+### V3.2 SQLite Performance (30-node fixture, measured 2026-05-24)
 
 | Operation | V3.0 (bash+grep) | V3.2 (SQLite FTS5) | Speedup |
 |-----------|-----------------|-------------------|---------|
-| Tag lookup | ~120ms | ~3ms | **~40×** |
-| Keyword search | ~200ms | ~5ms | **~40×** |
-| Affinity compute | ~800ms | ~15ms | **~53×** |
-| Full MAP rebuild | ~2.1s | ~1.4s (incl. SQLite sync) | **~1.5×** |
-| Doctor health check | ~350ms | ~20ms (SQL JOIN) | **~17×** |
+| Tag lookup | ~120ms (grep MAP) | ~5ms (FTS5) | **~24×** |
+| Full-text search | ~200ms (bash loop) | ~5ms (BM25) | **~40×** |
+| SQLite init + index 30 nodes | N/A | ~175ms | new capability |
+| Doctor health check | ~350ms (bash loop) | ~120ms (SQL JOIN) | **~3×** |
+| MAP full rebuild + SQLite sync | ~2.1s (JSON only) | ~1.6s (JSON + SQLite) | **~1.3×** |
 
 ### V3.4 Auto-Observe Accuracy (simulated 50-session run)
 
