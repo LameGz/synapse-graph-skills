@@ -103,3 +103,45 @@ Focus on Environment Bridges — which env vars connect services. CI/CD details,
 k8s resource limits, and scaling policies belong elsewhere.
 
 **Why:** dep_ nodes are link-trace endpoints, not DevOps runbooks.
+
+## Auto-Recorded Content Audit (V3.4)
+
+### Audit marker
+
+Every auto-written entry MUST include:
+```
+<!-- auto-recorded, confidence: N% -->
+```
+immediately after the entry. Human-written entries have NO marker.
+
+### Audit commands
+
+```bash
+# List all auto-recorded entries across all nodes
+grep -rn "auto-recorded" meta/ | wc -l
+
+# Find auto-recorded entries with low confidence (< 50%)
+grep -rn "auto-recorded, confidence: [1-4][0-9]%" meta/
+
+# Compare auto-recorded vs. human-written ratio
+auto=$(grep -r "auto-recorded" meta/ | wc -l)
+human=$(grep -r "^- " meta/*.md 2>/dev/null | grep -v "auto-recorded" | wc -l)
+echo "Auto: $auto, Human: $human"
+```
+
+### Review cadence
+
+- **Daily**: session-end hook shows what was auto-recorded. Glance at it.
+- **Weekly**: `git diff meta/` since last week. Spot-check entries with confidence < 70%.
+- **Monthly**: run `doctor.sh --audit-auto` (planned) to flag auto-entries that haven't been
+  touched by a human in 30+ days — these may need validation.
+
+### Rollback
+
+Auto-recorded content is just Markdown. To revert:
+```bash
+git diff meta/  # Review what was auto-written
+git checkout -- meta/feat_X.md  # Revert a single node
+git checkout -- meta/  # Revert all auto-writes (then rebuild MAP)
+bash scripts/generate_memory_map.sh --full
+```
