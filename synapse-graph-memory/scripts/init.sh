@@ -219,6 +219,26 @@ fi
 echo "   Detected modules: ${MODULES[*]}"
 echo ""
 
+# ─── Step 3.5: Auto-detect source interfaces ─────────────────────────────
+echo "Step 3.5: Scanning source files for public interfaces..."
+SOURCE_SCAN_SCRIPT="${SCRIPT_DIR}/source_scan.py"
+FRAGMENTS_DIR="${PROJECT_ROOT}/.claude/.synapse_cache/source_fragments"
+
+if [ -f "$SOURCE_SCAN_SCRIPT" ] && command -v python3 >/dev/null 2>&1; then
+  mkdir -p "$FRAGMENTS_DIR"
+  SCAN_RESULT=$(python3 "$SOURCE_SCAN_SCRIPT" --project "$PROJECT_ROOT" --output "$FRAGMENTS_DIR" --scan-depth 2 2>&1)
+  echo "   $SCAN_RESULT"
+  echo "   Fragments saved to: .claude/.synapse_cache/source_fragments/"
+elif [ -f "$SOURCE_SCAN_SCRIPT" ] && command -v python >/dev/null 2>&1; then
+  mkdir -p "$FRAGMENTS_DIR"
+  SCAN_RESULT=$(python "$SOURCE_SCAN_SCRIPT" --project "$PROJECT_ROOT" --output "$FRAGMENTS_DIR" --scan-depth 2 2>&1)
+  echo "   $SCAN_RESULT"
+  echo "   Fragments saved to: .claude/.synapse_cache/source_fragments/"
+else
+  echo "   Skipping (source_scan.py not found or python3 unavailable)"
+fi
+echo ""
+
 # ─── Step 4: Generate mod_project.md ───────────────────────────────────
 echo "📝 Generating nodes..."
 
