@@ -21,6 +21,10 @@ CHANGED_FILE=""
 STATS_MODE=false
 USE_DB=false
 DB_PATH=""
+TRAVERSE_TYPES=""
+TRACE_FROM=""
+TRACE_DEPTH="4"
+TRACE_WIDTH="3"
 PROJECT_ROOT_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -35,6 +39,14 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --stats) STATS_MODE=true; shift ;;
+    --traverse-types)
+      TRAVERSE_TYPES="$2"
+      shift 2
+      ;;
+    --trace-from)
+      TRACE_FROM="$2"
+      shift 2
+      ;;
     --db) USE_DB=true; DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -57,6 +69,12 @@ CACHE_DIR="${PROJECT_ROOT}/.claude/.synapse_cache"
 # Set DB_PATH after PROJECT_ROOT is resolved
 if [ "$USE_DB" = true ]; then
   DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"
+fi
+
+# ─── Link-trace dispatch ──────────────────────────────────────────────
+if [ -n "${TRACE_FROM:-}" ] && [ -n "${TRAVERSE_TYPES:-}" ]; then
+  bfs_trace "$TRACE_FROM" "$TRAVERSE_TYPES" "${TRACE_DEPTH:-4}" "${TRACE_WIDTH:-3}"
+  exit $?
 fi
 
 mkdir -p "$CACHE_DIR"
@@ -184,6 +202,113 @@ print(f'Incremental update: {node_id} ({changed_file})')
   # Exit early — skip full rebuild
   exit 0
 fi
+
+# ─── bfs_trace(): State-machine BFS for link-trace queries ────────────
+bfs_trace() {
+  local start_node="$1"
+  local type_seq="$2"
+  local max_depth="${3:-4}"
+  local max_width="${4:-3}"
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo '{"error": "python3 required for bfs_trace"}' >&2
+    return 1
+  fi
+
+  python3 -c "
+import json, os, sys
+
+start_node = '${start_node}'
+type_seq = [t.strip() for t in '${type_seq}'.split(',')]
+max_depth = ${max_depth}
+max_width = ${max_width}
+project_root = '${PROJECT_ROOT}'
+db_path = os.path.join(project_root, '.synapse/cache/memory.db')
+
+# Try SQLite first, fall back to JSON
+if os.path.exists(db_path):
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    def get_type(node_id):
+        r = conn.execute('SELECT type FROM nodes WHERE id = ?', (node_id,)).fetchone()
+        return r[0] if r else 'unknown'
+    def get_depends_on(node_id):
+        deps = conn.execute('''SELECT target FROM edges
+                                WHERE source = ? AND kind IN (\"depends_on\", \"auto_linked\")''',
+                            (node_id,)).fetchall()
+        return [d[0] for d in deps]
+    conn.close()
+else:
+    map_file = os.path.join(project_root, 'MEMORY_MAP.json')
+    if not os.path.exists(map_file):
+        print(json.dumps({'error': 'No MAP or SQLite found'}))
+        sys.exit(0)
+    with open(map_file) as f:
+        map_data = json.load(f)
+    nodes = map_data.get('nodes', {})
+    def get_type(node_id):
+        return nodes.get(node_id, {}).get('type', 'unknown')
+    def get_depends_on(node_id):
+        node = nodes.get(node_id, {})
+        return list(set(node.get('depends_on', []) + node.get('auto_linked', [])))
+
+if get_type(start_node) == 'unknown':
+    print(json.dumps({'error': f'Node not found: {start_node}'}))
+    sys.exit(0)
+
+terminal_idx = len(type_seq) - 1
+terminal_types = set(type_seq[-1:])
+
+queue = [{'node': start_node, 'depth': 0, 'type_pos': 0, 'path': [start_node]}]
+all_terminal_paths = []
+
+while queue:
+    current = queue.pop(0)
+    node_type = get_type(current['node'])
+
+    if node_type in terminal_types:
+        all_terminal_paths.append(current['path'])
+        continue
+
+    if current['depth'] >= max_depth:
+        continue
+
+    neighbors = get_depends_on(current['node'])
+    def relevance(nid):
+        t = get_type(nid)
+        for i in range(current['type_pos'], len(type_seq)):
+            if type_seq[i] == t:
+                return -i
+        return 999
+    neighbors.sort(key=relevance)
+    neighbors = neighbors[:max_width]
+
+    for neighbor in neighbors:
+        neighbor_type = get_type(neighbor)
+        valid_positions = [
+            i for i in range(current['type_pos'], len(type_seq))
+            if type_seq[i] == neighbor_type
+        ]
+        if not valid_positions:
+            continue
+        queue.append({
+            'node': neighbor,
+            'depth': current['depth'] + 1,
+            'type_pos': valid_positions[0],
+            'path': current['path'] + [neighbor]
+        })
+
+if all_terminal_paths:
+    valid = sorted(all_terminal_paths, key=len)[:max_width]
+    print(json.dumps({'paths': valid, 'partial': False}, ensure_ascii=False))
+else:
+    print(json.dumps({
+        'paths': [],
+        'partial': True,
+        'warning': f'No path reached terminal type(s): {terminal_types}'
+    }, ensure_ascii=False))
+" 2>&1
+}
 
 # ─── Cache helpers ─────────────────────────────────────────────────────
 # Cache key: sanitized relative path (replace / with _)
