@@ -108,6 +108,33 @@ for (nid,) in missing:
     print(f'MISSING FIELDS: {nid} (summary/type/status/updated empty)')
     issues += 1
 
+# Full-stack node validation (V3.3)
+db_empty = conn.execute('''
+    SELECT id FROM nodes WHERE type = \"database_table\" AND line_count < 10
+''').fetchall()
+for (nid,) in db_empty:
+    print(f'EMPTY DB NODE: {nid} (too short, may need skeleton columns)')
+    issues += 1
+
+ui_overdep = conn.execute('''
+    SELECT n.id, COUNT(e.target) as dep_count
+    FROM nodes n
+    LEFT JOIN edges e ON n.id = e.source AND e.kind = \"depends_on\"
+    WHERE n.type = \"ui_page\"
+    GROUP BY n.id
+    HAVING dep_count > 5
+''').fetchall()
+for nid, cnt in ui_overdep:
+    print(f'UI SPLIT SUGGESTION: {nid} ({cnt} deps > 5, consider Tab-level split)')
+    issues += 1
+
+dep_count = conn.execute('''
+    SELECT COUNT(*) FROM nodes WHERE type = \"deployment\"
+''').fetchone()[0]
+if dep_count > 5:
+    print(f'DEP COUNT: {dep_count} deployment nodes (>5 recommended max, consolidate)')
+    issues += 1
+
 count = conn.execute('SELECT COUNT(*) FROM nodes').fetchone()[0]
 conn.close()
 
