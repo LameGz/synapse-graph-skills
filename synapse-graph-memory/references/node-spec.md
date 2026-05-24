@@ -6,6 +6,19 @@
 - `feat_<name>.md` — Lifecycle-bound feature (login, payment integration). Move to `meta/archive/` when completed.
 - Flat or max 2 levels: `meta/` and `meta/archive/`.
 
+## Extended Node Types (Full-Stack Mode)
+
+When `init.sh --fullstack` is used, the following node types are available in addition to `mod_` and `feat_`:
+
+| Prefix | Type | Purpose | Granularity |
+|--------|------|---------|-------------|
+| `db_` | database_table | Database table with business-logic columns | One node per table |
+| `api_` | api_endpoint_group | Group of API endpoints (one router file) | One node per router file |
+| `ui_` | ui_page | Frontend page or major tab section | One node per page; split tabs if domain overlap < 30% |
+| `dep_` | deployment | Deployment unit as terminal anchor | One node per deployment unit (max 5 total) |
+
+For the full specification, see `references/fullstack-node-spec.md`.
+
 ## Size Constraint
 
 - **30-150 lines**: independently understandable after reading
@@ -29,6 +42,9 @@ auto_linked:           # High-confidence machine-suggested edges
 tags: [auth, login, jwt]
 aliases: [authentication, 认证, 登录, signin, token验证]
 # `blocks` is auto-computed (reverse of effective_edges). Do NOT add to node files.
+# **Bidirectional edge rule (FULL-STACK)**: `depends_on` is the ONLY write source for
+# dependencies. Reverse edges (`blocks`) are auto-computed by the engine and MUST NOT
+# be written in node files. The `post-tool-use` hook rejects any manual `blocks` field.
 ---
 ```
 

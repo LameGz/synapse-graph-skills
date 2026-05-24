@@ -67,3 +67,39 @@ Each Connection Point must be a machine-verifiable contract:
 The `<!-- @ref: path:line -->` anchor enables `session-end.sh` to verify the contract hasn't drifted from source code.
 
 **Why**: Free-text descriptions ("needs auth API") are useless for impact assessment. Structured contracts let both the agent and scripts verify correctness.
+
+## Full-Stack Patch Rules (V3.3)
+
+These rules apply when full-stack nodes (db_/api_/ui_/dep_) are present.
+
+### P1: db_ Nodes — Skeleton Fields Only
+
+Columns table in db_ nodes MUST only list business-logic fields (those referenced
+in WHERE/JOIN/IF conditions in application code). Audit fields (created_at, updated_at,
+remark, etc.) MUST be omitted or replaced with `... (省略 N 个辅助字段)`.
+
+**Why:** Full column lists rot within days of schema changes. Skeleton fields are stable.
+
+### P2: ui_ Nodes — Tab-Level Exception
+
+When a single page aggregates 3+ unrelated business domains AND the resulting
+`depends_on` overlap between them is < 30%, split into `ui_<page>-<tab>` nodes.
+
+**Why:** Prevents false traffic intersection in link-trace queries.
+
+### P3: Bidirectional Edges — Single Source of Truth
+
+`depends_on` in YAML frontmatter is the ONLY write source for graph edges.
+Reverse edges in `## Connection Points` sections are READ-ONLY display text
+auto-injected by the engine. The `post-tool-use` hook REJECTS manual `blocks`
+or reverse-dependency YAML entries.
+
+**Why:** Two-source bidirectional edges inevitably diverge. One source = no drift.
+
+### P4: dep_ Nodes — Terminal Anchors, Not Deployment Docs
+
+dep_ nodes record WHAT communicates in the deployment environment, not HOW to deploy.
+Focus on Environment Bridges — which env vars connect services. CI/CD details,
+k8s resource limits, and scaling policies belong elsewhere.
+
+**Why:** dep_ nodes are link-trace endpoints, not DevOps runbooks.
