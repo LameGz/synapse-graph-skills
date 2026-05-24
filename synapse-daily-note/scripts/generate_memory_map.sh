@@ -58,6 +58,125 @@ if [ ! -d "$META_DIR" ]; then
   exit 0
 fi
 
+# ─── Incremental mode: re-parse only specified node(s) ─────────────────
+if [ -n "$CHANGED_FILE" ] && [ -f "$META_DIR/$CHANGED_FILE" ]; then
+  fm=$(awk '/^---$/ {c++; next} c==1' "$META_DIR/$CHANGED_FILE" 2>/dev/null || true)
+
+  node_id=$(echo "$fm" | sed -n 's/^id:[[:space:]]*//p' | tr -d '"' | xargs)
+  node_type=$(echo "$fm" | sed -n 's/^type:[[:space:]]*//p' | tr -d '"' | xargs)
+  node_status=$(echo "$fm" | sed -n 's/^status:[[:space:]]*//p' | tr -d '"' | xargs)
+  node_summary=$(echo "$fm" | sed -n 's/^summary:[[:space:]]*//p' | tr -d '"' | xargs)
+  node_updated=$(echo "$fm" | sed -n 's/^updated:[[:space:]]*//p' | tr -d '"' | xargs)
+
+  if [ -z "$node_id" ]; then
+    echo "Warning: --changed file has no id in frontmatter: $CHANGED_FILE" >&2
+    exit 0
+  fi
+
+  MAP_FILE="${PROJECT_ROOT}/MEMORY_MAP.json"
+
+  if [ -f "$MAP_FILE" ] && command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import json, sys
+
+node_id = '${node_id}'
+changed_file = '${CHANGED_FILE}'
+map_file = '${MAP_FILE}'
+
+try:
+    with open(map_file) as f:
+        data = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    data = {'nodes': {}, 'tag_index': {}, 'keyword_index': {}, 'affinity': {}}
+
+# Build node data
+depends_on = []
+auto_linked = []
+tags_list = []
+aliases_list = []
+
+fm = '''$(echo "$fm" | sed "s/'/'\\\\''/g")'''
+
+for line in fm.split('\n'):
+    line = line.strip()
+    if line.startswith('depends_on:'):
+        val = line.split(':', 1)[1].strip()
+        if val.startswith('[') and val.endswith(']'):
+            depends_on = [v.strip().strip(\"'\\\"\") for v in val[1:-1].split(',') if v.strip()]
+    elif line.startswith('auto_linked:'):
+        val = line.split(':', 1)[1].strip()
+        if val.startswith('[') and val.endswith(']'):
+            auto_linked = [v.strip().strip(\"'\\\"\") for v in val[1:-1].split(',') if v.strip()]
+    elif line.startswith('tags:'):
+        val = line.split(':', 1)[1].strip()
+        if val.startswith('[') and val.endswith(']'):
+            tags_list = [v.strip().strip(\"'\\\"\") for v in val[1:-1].split(',') if v.strip()]
+    elif line.startswith('aliases:'):
+        val = line.split(':', 1)[1].strip()
+        if val.startswith('[') and val.endswith(']'):
+            aliases_list = [v.strip().strip(\"'\\\"\") for v in val[1:-1].split(',') if v.strip()]
+
+node_data = {
+    'id': node_id,
+    'type': '${node_type}',
+    'status': '${node_status}',
+    'summary': '${node_summary}',
+    'depends_on': depends_on,
+    'auto_linked': auto_linked,
+    'tags': tags_list,
+    'aliases': aliases_list,
+    'updated': '${node_updated}',
+    'file': changed_file
+}
+
+# Update or insert node
+data['nodes'][node_id] = node_data
+
+# Rebuild tag index for this node's tags
+if 'tag_index' not in data:
+    data['tag_index'] = {}
+for tag in tags_list:
+    if tag not in data['tag_index']:
+        data['tag_index'][tag] = []
+    if node_id not in data['tag_index'][tag]:
+        data['tag_index'][tag].append(node_id)
+
+# Recompute blocks for all nodes
+for nid in data['nodes']:
+    if 'blocks' not in data['nodes'][nid]:
+        data['nodes'][nid]['blocks'] = []
+    else:
+        data['nodes'][nid]['blocks'] = []
+
+for nid, ndata in data['nodes'].items():
+    for dep in ndata.get('depends_on', []):
+        dep_id = dep.replace('meta/', '').replace('.md', '')
+        if dep_id in data['nodes']:
+            if nid not in data['nodes'][dep_id].get('blocks', []):
+                data['nodes'][dep_id].setdefault('blocks', []).append(nid)
+    for link in ndata.get('auto_linked', []):
+        link_id = link.replace('meta/', '').replace('.md', '')
+        if link_id in data['nodes']:
+            if nid not in data['nodes'][link_id].get('blocks', []):
+                data['nodes'][link_id].setdefault('blocks', []).append(nid)
+
+with open(map_file, 'w') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+print(f'Incremental update: {node_id} ({changed_file})')
+" 2>&1
+
+  # Also update cache for this file
+  ck=$(echo "$CHANGED_FILE" | sed 's/[\/\\]/_/g')
+  awk '/^---$/ {c++; next} c==1' "$META_DIR/$CHANGED_FILE" > "${CACHE_DIR}/${ck}.cache" 2>/dev/null || true
+
+  else
+    echo "Incremental update: $node_id ($CHANGED_FILE) — full rebuild required (no MAP or python3)"
+  fi
+
+  # Exit early — skip full rebuild
+  exit 0
+fi
+
 # ─── Cache helpers ─────────────────────────────────────────────────────
 # Cache key: sanitized relative path (replace / with _)
 cache_key() {
