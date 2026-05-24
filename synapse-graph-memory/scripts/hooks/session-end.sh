@@ -10,10 +10,50 @@ META_DIR="${PROJECT_ROOT}/meta"
 echo "---"
 echo "🔍 Synapse Session End — Running memory integrity checks..."
 
-if [ -f "${PROJECT_ROOT}/scripts/generate_memory_map.sh" ]; then
-  bash "${PROJECT_ROOT}/scripts/generate_memory_map.sh" 2>&1
+MAP_SCRIPT="${PROJECT_ROOT}/scripts/generate_memory_map.sh"
+WEEKLY_FLAG="${PROJECT_ROOT}/.claude/.synapse_cache/.weekly_full_check"
+FULL_CHECK_INTERVAL_DAYS=7
+
+need_full=false
+
+if [ -f "$WEEKLY_FLAG" ]; then
+  last_run=$(cat "$WEEKLY_FLAG" 2>/dev/null || echo "0")
+  now=$(date +%s)
+  days_since=$(( (now - last_run) / 86400 ))
+  if [ "$days_since" -ge "$FULL_CHECK_INTERVAL_DAYS" ]; then
+    need_full=true
+  fi
 else
-  echo "⚠ generate_memory_map.sh not found at scripts/generate_memory_map.sh"
+  need_full=true  # First run — do full check
+fi
+
+if [ -f "$MAP_SCRIPT" ]; then
+  if $need_full; then
+    echo "Running full MAP rebuild (weekly health check)..."
+    bash "$MAP_SCRIPT" --full 2>&1
+    date +%s > "$WEEKLY_FLAG"
+  else
+    # Incremental: only re-index meta/ files changed in this session
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+      changed_files=$(git diff --name-only HEAD -- meta/ 2>/dev/null || true)
+      if [ -n "$changed_files" ]; then
+        echo "Running incremental MAP update for changed nodes..."
+        while IFS= read -r f; do
+          [ -z "$f" ] && continue
+          [[ "$f" == *"MEMORY_MAP.md"* ]] && continue
+          # Extract just the filename from meta/ path
+          node_name=$(basename "$f")
+          bash "$MAP_SCRIPT" --project "$PROJECT_ROOT" --changed "$node_name" 2>&1
+        done <<< "$changed_files"
+      else
+        echo "No meta/ changes detected. Skipping MAP rebuild."
+      fi
+    else
+      bash "$MAP_SCRIPT" 2>&1  # Not a git repo — standard rebuild
+    fi
+  fi
+else
+  echo "⚠ generate_memory_map.sh not found"
 fi
 
 # ─── Step 2: Scan for nodes modified in this session ──────────────────
