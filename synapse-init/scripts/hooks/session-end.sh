@@ -410,6 +410,118 @@ if [ -d "$META_DIR" ]; then
   fi
 fi
 
+# ─── Step 5: Auto-observe & auto-record (V3.4) ──────────────────────
+AUTO_OBSERVE_SCRIPT="${PROJECT_ROOT}/scripts/auto_observe.py"
+AUTO_PROPOSAL_DIR="${PROJECT_ROOT}/.claude/.synapse_cache/auto-proposals"
+AUTO_CONFIRM_THRESHOLD=70
+
+if [ -f "$AUTO_OBSERVE_SCRIPT" ] && command -v python3 >/dev/null 2>&1; then
+  mkdir -p "$AUTO_PROPOSAL_DIR"
+
+  today=$(date +%Y-%m-%d)
+  proposal_file="${AUTO_PROPOSAL_DIR}/${today}_proposals.json"
+
+  python3 "$AUTO_OBSERVE_SCRIPT" --project "$PROJECT_ROOT" \
+    --min-confidence 40 --output "$proposal_file" 2>&1
+
+  if [ -f "$proposal_file" ]; then
+    python3 -c "
+import json, sys, os
+
+with open('${proposal_file}') as f:
+    data = json.load(f)
+
+high = [p for p in data.get('proposals', []) if p['confidence'] >= ${AUTO_CONFIRM_THRESHOLD}]
+low = [p for p in data.get('proposals', []) if p['confidence'] < ${AUTO_CONFIRM_THRESHOLD}]
+
+if high:
+    with open('${AUTO_PROPOSAL_DIR}/auto_apply.json', 'w') as f:
+        json.dump({'proposals': high}, f, indent=2, ensure_ascii=False)
+
+if low:
+    with open('${AUTO_PROPOSAL_DIR}/needs_review.json', 'w') as f:
+        json.dump({'proposals': low}, f, indent=2, ensure_ascii=False)
+
+print(f'AUTO:{len(high)}/{len(data.get(\"proposals\", []))} proposals above threshold')
+" 2>&1
+
+    if [ -f "${AUTO_PROPOSAL_DIR}/auto_apply.json" ]; then
+      auto_count=$(python3 -c "import json; print(len(json.load(open('${AUTO_PROPOSAL_DIR}/auto_apply.json'))['proposals']))" 2>/dev/null || echo 0)
+
+      if [ "$auto_count" -gt 0 ]; then
+        echo ""
+        echo "📝 Auto-Recorded (V3.4):"
+        echo "──────────────────────"
+
+        python3 -c "
+import json, os, subprocess
+
+proj = '${PROJECT_ROOT}'
+with open('${AUTO_PROPOSAL_DIR}/auto_apply.json') as f:
+    data = json.load(f)
+
+note_script = os.path.join(proj, 'scripts/synapse_note.sh')
+if not os.path.exists(note_script):
+    note_script = os.path.join(os.path.dirname('${SCRIPT_DIR}'), 'synapse_note.sh')
+
+applied = 0
+for p in data['proposals']:
+    node = p.get('target_node', 'unknown')
+    content = p.get('content', '')
+    change_type = p.get('change_type', 'change_log')
+    confidence = p.get('confidence', 0)
+    if not content:
+        continue
+    text = content
+    if node and node != 'unknown' and node != '__all_db__' and node != 'all_db_':
+        text = f'[{node}] {content}'
+    try:
+        result = subprocess.run(
+            ['bash', note_script, '--project', proj, '--text', text,
+             '--edge-mode', 'auto', '--auto-confirm'],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0:
+            applied += 1
+            mark = chr(0x2713)
+            print(f'  {mark} {node}: {content[:80]}')
+        else:
+            print(f'  X {node}: failed ({result.stderr[:60]})')
+    except Exception as e:
+        print(f'  X {node}: error ({e})')
+
+print(f'')
+print(f'  {applied}/{len(data[\"proposals\"])} proposals auto-applied')
+" 2>&1
+      fi
+    fi
+
+    if [ -f "${AUTO_PROPOSAL_DIR}/needs_review.json" ]; then
+      low_count=$(python3 -c "import json; print(len(json.load(open('${AUTO_PROPOSAL_DIR}/needs_review.json'))['proposals']))" 2>/dev/null || echo 0)
+
+      if [ "$low_count" -gt 0 ]; then
+        echo ""
+        echo "⚠  Needs Review (confidence < ${AUTO_CONFIRM_THRESHOLD}%):"
+        echo "─────────────────────────────────────────"
+
+        python3 -c "
+import json
+with open('${AUTO_PROPOSAL_DIR}/needs_review.json') as f:
+    data = json.load(f)
+for i, p in enumerate(data['proposals'][:5]):
+    print(f'  {i+1}. [{p.get(\"change_type\", \"?\")}] {p.get(\"content\", \"\")[:100]}')
+    print(f'     confidence: {p.get(\"confidence\", 0)}% | target: {p.get(\"target_node\", \"?\")}')
+    if p.get('evidence'):
+        print(f'     evidence: {p[\"evidence\"]}')
+n = len(data['proposals'])
+if n > 5:
+    print(f'  ... and {n - 5} more. See {AUTO_PROPOSAL_DIR}/needs_review.json')
+" 2>&1
+      fi
+    fi
+  fi
+fi
+
 echo "---"
 
 # ─── Clear read-protocol marker for next session ───────────────────────

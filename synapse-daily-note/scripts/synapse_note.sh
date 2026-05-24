@@ -8,6 +8,7 @@ EDGE_MODE="auto"
 YES=0
 DRY_RUN=0
 KEEP_PROPOSAL=0
+AUTO_CONFIRM=0
 
 usage() {
   cat <<'USAGE'
@@ -58,6 +59,10 @@ while [ $# -gt 0 ]; do
       ;;
     --yes)
       YES=1
+      shift
+      ;;
+    --auto-confirm)
+      AUTO_CONFIRM=1
       shift
       ;;
     -h|--help)
@@ -123,6 +128,21 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "- proposal: $PROPOSAL"
   echo "- applied: no"
   trap - EXIT
+  exit 0
+fi
+
+# ─── Auto-confirm mode: skip interaction ────────────────────────────
+if [ "$AUTO_CONFIRM" -eq 1 ]; then
+  EDGE_MODE="${EDGE_MODE:-auto}"
+  python "$SCRIPT_DIR/apply_memory_proposal.py" --project "$PROJECT_ABS" --proposal "$PROPOSAL" --edge-mode "$EDGE_MODE" 2>&1
+  if [ "$TARGET_NODE" != "unknown" ] && [ -f "${PROJECT_ABS}/meta/${TARGET_NODE}.md" ]; then
+    bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$PROJECT_ABS" --changed "${TARGET_NODE}.md" 2>&1
+  else
+    bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$PROJECT_ABS" --full 2>&1
+  fi
+  doctor_output="$(bash "$SCRIPT_DIR/doctor.sh" --project "$PROJECT_ABS" 2>&1 || true)"
+  echo "Auto-recorded: $TARGET_NODE"
+  echo "- doctor: $(echo "$doctor_output" | head -1)"
   exit 0
 fi
 
