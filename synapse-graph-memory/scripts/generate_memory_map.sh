@@ -15,7 +15,21 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
+if [ -x /usr/bin/find ]; then
+  find() { /usr/bin/find "$@"; }
+fi
+if [ -x /usr/bin/sort ]; then
+  sort() { /usr/bin/sort "$@"; }
+fi
+if [ -x /usr/bin/head ]; then
+  head() { /usr/bin/head "$@"; }
+fi
+if [ -x /usr/bin/xargs ]; then
+  xargs() { /usr/bin/xargs "$@"; }
+fi
+
 # ─── Argument parsing ──────────────────────────────────────────────────
+ORIGINAL_ARGS=("$@")
 FULL_REBUILD=false
 CHANGED_FILE=""
 STATS_MODE=false
@@ -65,6 +79,23 @@ fi
 META_DIR="${PROJECT_ROOT}/meta"
 OUTPUT="${PROJECT_ROOT}/MEMORY_MAP.md"
 CACHE_DIR="${PROJECT_ROOT}/.claude/.synapse_cache"
+
+PY_ENGINE="${SCRIPT_DIR}/generate_memory_map.py"
+PY_BIN=""
+if command -v python3 >/dev/null 2>&1; then
+  PY_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PY_BIN="python"
+fi
+
+if [ -z "${SYNAPSE_LEGACY_MAP:-}" ] \
+  && [ -n "$PY_BIN" ] \
+  && [ -f "$PY_ENGINE" ] \
+  && [ "$USE_DB" = false ] \
+  && [ -z "$TRACE_FROM" ] \
+  && [ -z "$TRAVERSE_TYPES" ]; then
+  exec "$PY_BIN" "$PY_ENGINE" "${ORIGINAL_ARGS[@]}"
+fi
 
 # Set DB_PATH after PROJECT_ROOT is resolved
 if [ "$USE_DB" = true ]; then
@@ -504,7 +535,7 @@ declare -A NODE_AUTO_LINKED    # rel_path -> comma-separated auto_linked
 declare -A NODE_INFO           # rel_path -> full parsed line
 declare -A CHANGELOG_PER_NODE  # rel_path -> newline-separated "date|summary"
 declare -A CHANGELOG_INDEX     # YYYY-MM -> newline-separated "date|id|rel|summary"
-declare -a ALL_NODES
+declare -a ALL_NODES=()
 
 parsed_count=0
 cached_count=0
@@ -1247,4 +1278,3 @@ if [ "$STATS_MODE" = true ]; then
 }
 STATS
 fi
-

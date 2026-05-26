@@ -17,6 +17,18 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [ -z "$PYTHON_BIN" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON_BIN="python3"
+    elif command -v python >/dev/null 2>&1; then
+        PYTHON_BIN="python"
+    else
+        echo -e "${RED}ERROR: python or python3 is required${NC}" >&2
+        exit 1
+    fi
+fi
+
 SKILL=""
 ALL=false
 EVAL_ID=""
@@ -81,14 +93,14 @@ validate_skill() {
     fi
 
     # Validate evals.json
-    if ! python3 -c "import json; json.load(open('$skill_dir/evals/evals.json'))" 2>/dev/null; then
+    if ! "$PYTHON_BIN" -m json.tool "$skill_dir/evals/evals.json" >/dev/null 2>&1; then
         echo -e "${RED}FAIL${NC} (invalid evals.json)"
         return 1
     fi
 
     # Count eval cases
     local eval_count
-    eval_count=$(python3 -c "import json; d=json.load(open('$skill_dir/evals/evals.json')); print(len(d['evals']))")
+    eval_count=$(grep -c '"id"' "$skill_dir/evals/evals.json" || true)
     echo -e "${GREEN}OK${NC} ($eval_count eval cases)"
     return 0
 }
@@ -105,14 +117,15 @@ run_eval() {
 
     # Read the eval prompt from evals.json
     local prompt
-    prompt=$(python3 -c "
-import json
-d = json.load(open('$skill_dir/evals/evals.json'))
-for ev in d['evals']:
-    if ev['id'] == $eval_id:
-        print(ev['prompt'])
-        break
-")
+    prompt=$(awk -v id="$eval_id" '
+        $0 ~ "\"id\"[[:space:]]*:[[:space:]]*" id { found=1 }
+        found && /"prompt"/ {
+          sub(/^[[:space:]]*"prompt"[[:space:]]*:[[:space:]]*"/, "")
+          sub(/",[[:space:]]*$/, "")
+          print
+          exit
+        }
+    ' "$skill_dir/evals/evals.json")
 
     if [ -z "$prompt" ]; then
         echo -e "${RED}ERROR: eval case $eval_id not found${NC}"
@@ -134,11 +147,18 @@ echo ""
 
 SKILLS_TO_TEST=()
 if [ "$ALL" = true ]; then
-    for d in "$REPO_ROOT/skills/"synapse-*/; do
+    for d in "$REPO_ROOT"/synapse-*/; do
+        [ -d "$d" ] || continue
+        [ -f "$d/SKILL.md" ] || continue
         SKILLS_TO_TEST+=("$d")
     done
 else
-    SKILLS_TO_TEST+=("$REPO_ROOT/skills/$SKILL")
+    SKILLS_TO_TEST+=("$REPO_ROOT/$SKILL")
+fi
+
+if [ "${#SKILLS_TO_TEST[@]}" -eq 0 ]; then
+    echo -e "${RED}ERROR: No synapse-* skill directories found under $REPO_ROOT${NC}"
+    exit 1
 fi
 
 PASSED=0

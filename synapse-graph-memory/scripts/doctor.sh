@@ -5,6 +5,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
 
+if [ -x /usr/bin/find ]; then
+  find() { /usr/bin/find "$@"; }
+fi
+if [ -x /usr/bin/xargs ]; then
+  xargs() { /usr/bin/xargs "$@"; }
+fi
+
 if [ "${1:-}" = "--project" ]; then
   PROJECT_ROOT="$2"
 fi

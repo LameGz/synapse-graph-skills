@@ -119,7 +119,7 @@ trap cleanup_proposal EXIT
 
 echo "Synapse Solo proposal saved: $PROPOSAL"
 echo
-bash "$SCRIPT_DIR/suggest_edges.sh" --proposal "$PROPOSAL" || true
+bash "$SCRIPT_DIR/suggest_edges.sh" --project "$PROJECT_ABS" --proposal "$PROPOSAL" || true
 
 if [ "$DRY_RUN" -eq 1 ]; then
   echo

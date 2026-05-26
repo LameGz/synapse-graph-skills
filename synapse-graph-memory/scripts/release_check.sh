@@ -32,19 +32,20 @@ while [ $# -gt 0 ]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-EXAMPLE_DIR="$ROOT_DIR/examples/solo-saas"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/.." && pwd)"
+EXAMPLE_DIR="$SKILL_DIR/examples/solo-saas"
 
-cd "$ROOT_DIR"
+cd "$REPO_ROOT"
 
 echo "Synapse Solo release check"
-echo "Project: $ROOT_DIR"
+echo "Project: $REPO_ROOT"
 echo ""
 
 if [ "$SKIP_TESTS" -eq 1 ]; then
   echo "- tests: skipped"
 else
-  python -m unittest discover -s tests -p "test_*.py" -v
+  bash "$REPO_ROOT/tests/test_runner.sh" --all
   echo "- tests: OK"
 fi
 
@@ -57,8 +58,8 @@ echo "- solo-saas doctor: OK"
 bash "$SCRIPT_DIR/demo_solo_saas.sh" --project "$EXAMPLE_DIR" --dry-run
 echo "- solo-saas demo: OK"
 
-for doc in README.md README.zh-CN.md USAGE.md CHANGELOG.md; do
-  if [ ! -f "$ROOT_DIR/$doc" ]; then
+for doc in README.md README.zh-CN.md USAGE.md RELEASE_NOTES.md; do
+  if [ ! -f "$REPO_ROOT/$doc" ]; then
     echo "Missing required doc: $doc" >&2
     exit 1
   fi
