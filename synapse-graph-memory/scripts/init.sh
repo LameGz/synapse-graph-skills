@@ -24,6 +24,29 @@ fi
 META_DIR="${PROJECT_ROOT}/meta"
 MAP_SCRIPT="${SCRIPT_DIR}/generate_memory_map.sh"
 
+pick_python() {
+  local candidate
+  for candidate in "${PYTHON_BIN:-}" python3 python; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c "import json" >/dev/null 2>&1 || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+PY_BIN="$(pick_python || true)"
+
+python_path() {
+  local path="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$path" 2>/dev/null || printf '%s\n' "$path"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
 FULLSTACK=false
 PROJECT_ROOT_OVERRIDE=""
 
@@ -40,6 +63,8 @@ if [ -n "$PROJECT_ROOT_OVERRIDE" ]; then
   PROJECT_ROOT="$(cd "$PROJECT_ROOT_OVERRIDE" && pwd)"
   META_DIR="${PROJECT_ROOT}/meta"
 fi
+
+PROJECT_ROOT_PY="$(python_path "$PROJECT_ROOT")"
 
 echo "🧠 Synapse Cold-Start Wizard"
 echo "   Project: $PROJECT_ROOT"
@@ -85,8 +110,8 @@ SETTINGS_TEMPLATE="${SKILL_DIR}/settings.template.json"
 
 merge_settings() {
   local target="$1" template="$2"
-  command -v python3 >/dev/null 2>&1 || return 1
-  python3 -c "
+  [ -n "$PY_BIN" ] || return 1
+  "$PY_BIN" -c "
 import json
 with open('$target') as f: s = json.load(f)
 with open('$template') as f: t = json.load(f)
@@ -122,7 +147,7 @@ elif [ -f "$SETTINGS_FILE" ] && [ -f "$SETTINGS_TEMPLATE" ]; then
     echo "   ✓ Merged Synapse hooks into existing .claude/settings.json"
   else
     echo "   ⚠ .claude/settings.json exists but does not register Synapse hooks."
-    echo "     Install python3 for automatic merge, or merge manually:"
+    echo "     Install python for automatic merge, or merge manually:"
     echo "       ${SETTINGS_TEMPLATE} → ${SETTINGS_FILE}"
   fi
 fi
@@ -241,18 +266,13 @@ echo "Step 3.5: Scanning source files for public interfaces..."
 SOURCE_SCAN_SCRIPT="${SCRIPT_DIR}/source_scan.py"
 FRAGMENTS_DIR="${PROJECT_ROOT}/.claude/.synapse_cache/source_fragments"
 
-if [ -f "$SOURCE_SCAN_SCRIPT" ] && command -v python3 >/dev/null 2>&1; then
+if [ -f "$SOURCE_SCAN_SCRIPT" ] && [ -n "$PY_BIN" ]; then
   mkdir -p "$FRAGMENTS_DIR"
-  SCAN_RESULT=$(python3 "$SOURCE_SCAN_SCRIPT" --project "$PROJECT_ROOT" --output "$FRAGMENTS_DIR" --scan-depth 2 2>&1)
-  echo "   $SCAN_RESULT"
-  echo "   Fragments saved to: .claude/.synapse_cache/source_fragments/"
-elif [ -f "$SOURCE_SCAN_SCRIPT" ] && command -v python >/dev/null 2>&1; then
-  mkdir -p "$FRAGMENTS_DIR"
-  SCAN_RESULT=$(python "$SOURCE_SCAN_SCRIPT" --project "$PROJECT_ROOT" --output "$FRAGMENTS_DIR" --scan-depth 2 2>&1)
+  SCAN_RESULT=$("$PY_BIN" "$SOURCE_SCAN_SCRIPT" --project "$PROJECT_ROOT" --output "$FRAGMENTS_DIR" --scan-depth 2 2>&1)
   echo "   $SCAN_RESULT"
   echo "   Fragments saved to: .claude/.synapse_cache/source_fragments/"
 else
-  echo "   Skipping (source_scan.py not found or python3 unavailable)"
+  echo "   Skipping (source_scan.py not found or python unavailable)"
 fi
 echo ""
 
@@ -265,13 +285,15 @@ if $FULLSTACK; then
   echo ""
   echo "Layer 1/4: Database schema..."
   PRISMA_SCHEMA="${PROJECT_ROOT}/prisma/schema.prisma"
-  if [ -f "$PRISMA_SCHEMA" ] && command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+  if [ -f "$PRISMA_SCHEMA" ] && [ -n "$PY_BIN" ]; then
+    SYNAPSE_PROJECT_ROOT="$PROJECT_ROOT_PY" \
+    SYNAPSE_PRISMA_SCHEMA="$(python_path "$PRISMA_SCHEMA")" \
+    "$PY_BIN" -c "
 import os, re
-project = '${PROJECT_ROOT}'
+project = os.environ['SYNAPSE_PROJECT_ROOT']
 meta_dir = os.path.join(project, 'meta')
 os.makedirs(meta_dir, exist_ok=True)
-with open('${PRISMA_SCHEMA}') as f:
+with open(os.environ['SYNAPSE_PRISMA_SCHEMA']) as f:
     content = f.read()
 models = re.findall(r'model\s+(\w+)\s*\{', content)
 for model_name in models:
@@ -313,21 +335,21 @@ summary: {model_name} 表 — auto-detected from Prisma schema
         print(f'  + db_{model_name.lower()}')
 " 2>&1
   else
-    echo "  (no prisma/schema.prisma found or python3 unavailable)"
+    echo "  (no prisma/schema.prisma found or python unavailable)"
   fi
 
   # Layer 2: API Routes
   echo ""
   echo "Layer 2/4: API routes..."
-  if [ -f "${SCRIPT_DIR}/source_scan.py" ] && command -v python3 >/dev/null 2>&1; then
-    python3 "${SCRIPT_DIR}/source_scan.py" --project "$PROJECT_ROOT" --scan-depth 3 --json 2>/dev/null | python3 -c "
+  if [ -f "${SCRIPT_DIR}/source_scan.py" ] && [ -n "$PY_BIN" ]; then
+    "$PY_BIN" "${SCRIPT_DIR}/source_scan.py" --project "$PROJECT_ROOT" --scan-depth 3 --json 2>/dev/null | SYNAPSE_PROJECT_ROOT="$PROJECT_ROOT_PY" "$PY_BIN" -c "
 import json, os, sys
 try:
     data = json.load(sys.stdin)
 except json.JSONDecodeError:
     print('  (no source files with detectable interfaces)')
     sys.exit(0)
-project = '${PROJECT_ROOT}'
+project = os.environ['SYNAPSE_PROJECT_ROOT']
 meta_dir = os.path.join(project, 'meta')
 os.makedirs(meta_dir, exist_ok=True)
 router_groups = {}
@@ -382,10 +404,10 @@ if count == 0:
   # Layer 3: UI Pages
   echo ""
   echo "Layer 3/4: UI pages (skeleton only)..."
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+  if [ -n "$PY_BIN" ]; then
+    SYNAPSE_PROJECT_ROOT="$PROJECT_ROOT_PY" "$PY_BIN" -c "
 import os
-project = '${PROJECT_ROOT}'
+project = os.environ['SYNAPSE_PROJECT_ROOT']
 meta_dir = os.path.join(project, 'meta')
 os.makedirs(meta_dir, exist_ok=True)
 page_patterns = [
@@ -445,16 +467,16 @@ if count == 0:
     print('  (no UI page files detected)')
 " 2>&1
   else
-    echo "  (python3 unavailable, skipping UI detection)"
+    echo "  (python unavailable, skipping UI detection)"
   fi
 
   # Layer 4: Deployment
   echo ""
   echo "Layer 4/4: Deployment config..."
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+  if [ -n "$PY_BIN" ]; then
+    SYNAPSE_PROJECT_ROOT="$PROJECT_ROOT_PY" "$PY_BIN" -c "
 import os, re
-project = '${PROJECT_ROOT}'
+project = os.environ['SYNAPSE_PROJECT_ROOT']
 meta_dir = os.path.join(project, 'meta')
 os.makedirs(meta_dir, exist_ok=True)
 
@@ -502,7 +524,7 @@ else:
     print('  (no Docker files found)')
 " 2>&1
   else
-    echo "  (python3 unavailable, skipping deployment detection)"
+    echo "  (python unavailable, skipping deployment detection)"
   fi
 
   echo ""
