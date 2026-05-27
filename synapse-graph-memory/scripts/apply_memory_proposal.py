@@ -160,15 +160,19 @@ def insert_change_log(lines, change):
     return lines
 
 
-def add_auto_link_edges(frontmatter, proposal):
-    auto_linked = list(frontmatter.get("auto_linked", []))
+def add_edges(frontmatter, proposal, edge_mode):
+    if edge_mode == "none":
+        return frontmatter
+
+    target_key = "depends_on" if edge_mode == "explicit" else "auto_linked"
+    existing = list(frontmatter.get(target_key, []))
     for edge in proposal.get("edge_candidates", []):
-        if edge.get("apply_to") != "auto_linked":
+        if edge_mode == "auto" and edge.get("apply_to") != "auto_linked":
             continue
         target = edge.get("to")
-        if target and target not in auto_linked:
-            auto_linked.append(target)
-    frontmatter["auto_linked"] = auto_linked
+        if target and target not in existing:
+            existing.append(target)
+    frontmatter[target_key] = existing
     return frontmatter
 
 
@@ -202,7 +206,33 @@ def insert_edge_evidence(lines, proposal):
     return lines
 
 
-def apply_proposal(project, proposal):
+def insert_edge_review_issues(lines, proposal):
+    additions = []
+    for edge in proposal.get("edge_candidates", []):
+        target = edge.get("to")
+        if not target:
+            continue
+        evidence = "; ".join(edge.get("evidence", []))
+        line = f"- Review potential edge to `{target}`"
+        if evidence:
+            line += f": {evidence}"
+        additions.append(line)
+    additions = [line for line in additions if line not in lines]
+    if not additions:
+        return lines
+    start, end = section_bounds(lines, "## Open Issues")
+    if start is None:
+        lines.extend(["", "## Open Issues"])
+        start, end = len(lines) - 1, len(lines)
+    if any(line.strip() == "None." for line in lines[start + 1:end]):
+        first_none = next(i for i in range(start + 1, end) if lines[i].strip() == "None.")
+        lines[first_none:first_none + 1] = additions
+    else:
+        lines[end:end] = additions
+    return lines
+
+
+def apply_proposal(project, proposal, edge_mode):
     target = project / proposal["target_node"]
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
@@ -211,11 +241,14 @@ def apply_proposal(project, proposal):
         frontmatter = dict(proposal.get("suggested_frontmatter", {}))
         body = create_body(proposal)
 
-    frontmatter = add_auto_link_edges(frontmatter, proposal)
+    frontmatter = add_edges(frontmatter, proposal, edge_mode)
     lines = body.splitlines()
     node_update = proposal.get("node_update", {})
     lines = insert_current_state(lines, node_update.get("current_state_bullets", []))
-    lines = insert_edge_evidence(lines, proposal)
+    if edge_mode == "issue":
+        lines = insert_edge_review_issues(lines, proposal)
+    elif edge_mode != "none":
+        lines = insert_edge_evidence(lines, proposal)
     lines = insert_change_log(lines, node_update.get("change_log_entry", {}))
     text = format_frontmatter(frontmatter) + "\n\n" + "\n".join(lines).rstrip() + "\n"
     target.write_text(text, encoding="utf-8")
@@ -225,11 +258,12 @@ def main():
     parser = argparse.ArgumentParser(description="Apply a Synapse memory proposal to Markdown nodes.")
     parser.add_argument("--project", default=".")
     parser.add_argument("--proposal", required=True)
+    parser.add_argument("--edge-mode", choices=["auto", "explicit", "none", "issue"], default="auto")
     args = parser.parse_args()
 
     project = Path(args.project).resolve()
     proposal = json.loads(Path(args.proposal).read_text(encoding="utf-8-sig"))
-    apply_proposal(project, proposal)
+    apply_proposal(project, proposal, args.edge_mode)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+model User {
+  id                 String @id
+  email              String @unique
+  subscriptionStatus String
+}
+
+model Subscription {
+  id     String @id
+  userId String
+  plan   String
+}

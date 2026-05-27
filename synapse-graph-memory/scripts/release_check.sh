@@ -32,23 +32,38 @@ while [ $# -gt 0 ]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-EXAMPLE_DIR="$ROOT_DIR/examples/solo-saas"
+SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$SKILL_DIR/.." && pwd)"
+EXAMPLE_DIR="$SKILL_DIR/examples/solo-saas"
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [ -z "$PYTHON_BIN" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+  else
+    PYTHON_BIN="python"
+  fi
+fi
 
-cd "$ROOT_DIR"
+cd "$REPO_ROOT"
 
 echo "Synapse Solo release check"
-echo "Project: $ROOT_DIR"
+echo "Project: $REPO_ROOT"
 echo ""
 
 if [ "$SKIP_TESTS" -eq 1 ]; then
   echo "- tests: skipped"
 else
-  python -m unittest discover -s tests -p "test_*.py" -v
+  bash "$REPO_ROOT/tests/test_runner.sh" --all
+  bash "$REPO_ROOT/tests/test_generate_memory_map_py.sh"
+  bash "$REPO_ROOT/tests/test_suggest_edges_fast.sh"
+  bash "$REPO_ROOT/tests/test_suggest_edges_dedup.sh"
+  "$PYTHON_BIN" "$REPO_ROOT/tests/test_memory_inbox.py"
+  "$PYTHON_BIN" "$REPO_ROOT/tests/test_project_resume.py"
+  bash "$REPO_ROOT/tests/test_legacy_capabilities.sh"
   echo "- tests: OK"
 fi
 
-bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$EXAMPLE_DIR" --full
+SYNAPSE_MAP_GENERATED_AT=1970-01-01T00:00:00Z bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$EXAMPLE_DIR" --full
 echo "- solo-saas map: rebuilt"
 
 bash "$SCRIPT_DIR/doctor.sh" --project "$EXAMPLE_DIR"
@@ -57,8 +72,11 @@ echo "- solo-saas doctor: OK"
 bash "$SCRIPT_DIR/demo_solo_saas.sh" --project "$EXAMPLE_DIR" --dry-run
 echo "- solo-saas demo: OK"
 
-for doc in README.md README.zh-CN.md USAGE.md CHANGELOG.md; do
-  if [ ! -f "$ROOT_DIR/$doc" ]; then
+"$PYTHON_BIN" "$SCRIPT_DIR/project_resume.py" --project "$EXAMPLE_DIR" >/dev/null
+echo "- solo-saas resume: OK"
+
+for doc in README.md README.zh-CN.md USAGE.md RELEASE_NOTES.md; do
+  if [ ! -f "$REPO_ROOT/$doc" ]; then
     echo "Missing required doc: $doc" >&2
     exit 1
   fi

@@ -1,0 +1,227 @@
+{
+  "generated": "1970-01-01T00:00:00Z",
+  "stats": {
+    "nodes": 6,
+    "tags": 18,
+    "keywords": 6,
+    "warnings": 0
+  },
+  "nodes": [
+    {
+      "id": "feat_admin-notification",
+      "type": "feature",
+      "status": "in-progress",
+      "updated": "2026-05-12",
+      "summary": "Admin notifications alert operators when subscription state changes.",
+      "tags": [
+        "admin",
+        "notification",
+        "subscription"
+      ],
+      "aliases": [
+        "alerts"
+      ],
+      "depends_on": [
+        "meta/mod_user-account.md"
+      ],
+      "auto_linked": [],
+      "blocks": [],
+      "keywords": [],
+      "changelog": [
+        {
+          "date": "2026-05-12",
+          "summary": "Admin visibility."
+        }
+      ],
+      "open_issues": [],
+      "tokens": 211,
+      "rel": "meta/feat_admin-notification.md",
+      "path": "meta/feat_admin-notification.md"
+    },
+    {
+      "id": "feat_login",
+      "type": "feature",
+      "status": "in-progress",
+      "updated": "2026-05-11",
+      "summary": "Login feature connects the UI form to auth API tokens.",
+      "tags": [
+        "auth",
+        "login",
+        "frontend"
+      ],
+      "aliases": [
+        "signin"
+      ],
+      "depends_on": [
+        "meta/mod_auth-api.md"
+      ],
+      "auto_linked": [],
+      "blocks": [],
+      "keywords": [
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "API"
+      ],
+      "changelog": [
+        {
+          "date": "2026-05-11",
+          "summary": "Natural-language memory ingestion."
+        }
+      ],
+      "open_issues": [
+        "Add frontend password strength validation."
+      ],
+      "tokens": 237,
+      "rel": "meta/feat_login.md",
+      "path": "meta/feat_login.md"
+    },
+    {
+      "id": "feat_subscription",
+      "type": "feature",
+      "status": "in-progress",
+      "updated": "2026-05-12",
+      "summary": "Subscription feature displays paid plan state from user account and payment modules.",
+      "tags": [
+        "subscription",
+        "payment",
+        "billing"
+      ],
+      "aliases": [
+        "member",
+        "plan"
+      ],
+      "depends_on": [
+        "meta/mod_user-account.md",
+        "meta/mod_payment.md"
+      ],
+      "auto_linked": [],
+      "blocks": [],
+      "keywords": [
+        "/api/v1/payment/callback"
+      ],
+      "changelog": [
+        {
+          "date": "2026-05-12",
+          "summary": "Subscription payment integration."
+        }
+      ],
+      "open_issues": [
+        "Add downgrade flow for canceled plans."
+      ],
+      "tokens": 242,
+      "rel": "meta/feat_subscription.md",
+      "path": "meta/feat_subscription.md"
+    },
+    {
+      "id": "mod_auth-api",
+      "type": "module",
+      "status": "stable",
+      "updated": "2026-05-11",
+      "summary": "Auth API exposes login and refresh endpoints for session management.",
+      "tags": [
+        "auth",
+        "login",
+        "jwt",
+        "refresh"
+      ],
+      "aliases": [
+        "authentication",
+        "signin"
+      ],
+      "depends_on": [],
+      "auto_linked": [],
+      "blocks": [
+        "meta/feat_login.md"
+      ],
+      "keywords": [
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "API"
+      ],
+      "changelog": [
+        {
+          "date": "2026-05-11",
+          "summary": "Login integration."
+        }
+      ],
+      "open_issues": [],
+      "tokens": 229,
+      "rel": "meta/mod_auth-api.md",
+      "path": "meta/mod_auth-api.md"
+    },
+    {
+      "id": "mod_payment",
+      "type": "module",
+      "status": "stable",
+      "updated": "2026-05-12",
+      "summary": "Payment module receives callbacks and updates subscription records.",
+      "tags": [
+        "payment",
+        "subscription",
+        "billing"
+      ],
+      "aliases": [
+        "checkout",
+        "billing"
+      ],
+      "depends_on": [
+        "meta/mod_user-account.md"
+      ],
+      "auto_linked": [],
+      "blocks": [
+        "meta/feat_subscription.md"
+      ],
+      "keywords": [
+        "/api/v1/payment/callback",
+        "Subscription"
+      ],
+      "changelog": [
+        {
+          "date": "2026-05-12",
+          "summary": "Billing flow."
+        }
+      ],
+      "open_issues": [],
+      "tokens": 221,
+      "rel": "meta/mod_payment.md",
+      "path": "meta/mod_payment.md"
+    },
+    {
+      "id": "mod_user-account",
+      "type": "module",
+      "status": "stable",
+      "updated": "2026-05-12",
+      "summary": "User account module owns subscription status and account profile fields.",
+      "tags": [
+        "user",
+        "account",
+        "subscription",
+        "payment"
+      ],
+      "aliases": [
+        "member",
+        "plan"
+      ],
+      "depends_on": [],
+      "auto_linked": [],
+      "blocks": [
+        "meta/feat_admin-notification.md",
+        "meta/feat_subscription.md",
+        "meta/mod_payment.md"
+      ],
+      "keywords": [
+        "User"
+      ],
+      "changelog": [
+        {
+          "date": "2026-05-12",
+          "summary": "Subscription rollout."
+        }
+      ],
+      "open_issues": [],
+      "tokens": 226,
+      "rel": "meta/mod_user-account.md",
+      "path": "meta/mod_user-account.md"
+    }
+  ]
+}

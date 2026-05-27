@@ -5,6 +5,8 @@ description: Timeline and progress query for Synapse graph memory. Parses Change
 
 # Synapse Timeline
 
+v1.5 product shape: this skill remains a read-only timeline and issue query entry. For full project context restoration, prefer the core Project Resume flow (`project_resume.py --project <path>`) before loading individual nodes.
+
 ## Overview
 
 Read-only query tool that parses `meta/*.md` node files and `MEMORY_MAP.json` to answer time-based and progress questions. Never modifies files. Never writes.

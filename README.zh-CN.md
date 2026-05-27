@@ -1,5 +1,18 @@
 # Synapse Graph Skills
 
+> v1.5 产品发布博客：[Synapse v1.5：给 Claude Code 的轻量化图记忆 Skill](docs/synapse-v1.5-release-blog.zh-CN.md)
+>
+> GitHub：[LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills)
+
+## v1.5 Skill-First 发布候选
+
+Synapse v1.5 的定位是 Claude Code 个人工程记忆工具，而不是 MCP、服务端平台或向量数据库。四个 Skill 继续独立安装，`synapse-graph-memory` 是核心。
+
+- 正式统一 7 类节点：`project`、`module`、`feature`、`database_table`、`api_endpoint_group`、`ui_page`、`deployment`。
+- 新增 Memory Inbox：低置信自动记忆进入 `.synapse/inbox.json` 待审。
+- 新增 Project Resume：从 `MEMORY_MAP.json` 恢复项目焦点、最近变更、Open Issues 和下一步。
+- SQLite 仍然只是可删除、可重建的本地缓存；codegraph 方向是未来 bridge，不是 v1.5 依赖。
+
 **面向全栈个体户的工程记忆系统。** 图拓扑记忆 + SQLite FTS5 + 全栈节点类型（DB → API → UI → Deploy）+ AI 自主写入——永不一次性加载全部记忆，永不忘记记录。
 
 [English](README.md) | [使用指南](USAGE.md) | [架构文档](docs/architecture.md) | [Skills 总览](docs/skills-overview.md) | [演化日志](EVOLUTION.md)

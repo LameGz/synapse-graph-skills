@@ -38,5 +38,11 @@ Desktop.ini
 *-workspace/
 !tests/fixtures/*-workspace/
 
+# Versioned example fixtures
+!synapse-graph-memory/examples/
+!synapse-graph-memory/examples/**
+synapse-graph-memory/examples/**/.claude/
+synapse-graph-memory/examples/**/.synapse-proposal.json
+
 # Node
 node_modules/

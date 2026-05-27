@@ -27,7 +27,9 @@ For the full node specification, critical rules, and common mistakes, see `refer
 | Compound time+domain query | Filtered BFS: decompose query → tag + date filter + section locate |
 | Check downstream impact | Read `blocks` field in MEMORY_MAP.md before modifying any module |
 | Natural-language memory write | `synapse_note.sh --text "..."` (one command: ingest → suggest → apply → rebuild → doctor) |
-| Rebuild index | Auto-run by session-end hook; manual: `generate_memory_map.sh` |
+| Review queued memory | `memory_inbox.py list --project <path>` then `memory_inbox.py apply --project <path>` |
+| Resume project context | `project_resume.py --project <path>` (MAP-first project recovery) |
+| Rebuild index | Auto-run by session-end hook; manual full rebuild: `generate_memory_map.sh --full`; changed-node fast path: `generate_memory_map.sh --changed <node>.md` |
 | Health check | `doctor.sh` — validates frontmatter, dead links, orphans, oversized nodes |
 | Initialize project | `init.sh` — auto-detect stack, generate skeleton nodes |
 
@@ -45,6 +47,8 @@ When the user's message matches ANY of these, execute the Retrieval Protocol bef
 | "XX 链路怎么通的" / "这个按钮经过了哪些接口" / "从前端到数据库的完整路径" | Link Trace: bfs_trace() with --traverse-types ui,api,db,dep |
 
 **Keyword extraction**: Tech terms first (FastAPI → `api`, React → `frontend`). Module names direct (登录 → `auth, login`). If no keyword extracted AND no tag matches → Status Digest mode (read only, don't guess).
+
+Project resume triggers: when the user says "继续这个项目", "上次做到哪了", or "给我恢复一下上下文", run `project_resume.py --project <path>` before loading individual nodes.
 
 ## Query Routing
 
