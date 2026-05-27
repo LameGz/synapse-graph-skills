@@ -4,6 +4,10 @@
 
 Synapse v1.5 is a lightweight Claude Code personal engineering memory suite. The four skills remain independently installable, while `synapse-graph-memory` is the core product.
 
+Read the v1.5 product launch note: [Synapse v1.5: Claude Code lightweight graph memory Skill](docs/synapse-v1.5-release-blog.zh-CN.md).
+
+GitHub: [LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills)
+
 - Seven node types: `project`, `module`, `feature`, `database_table`, `api_endpoint_group`, `ui_page`, `deployment`.
 - Memory Inbox queues low-confidence auto-observed memories in `.synapse/inbox.json`.
 - Project Resume restores current focus, recent changes, open issues, and next actions from `MEMORY_MAP.json`.

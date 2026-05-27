@@ -2,6 +2,8 @@
 
 > CodeGraph 让 AI 更懂“代码在哪里”。Synapse 想解决另一个更日常的问题：AI 下次回来时，还记得这个项目做到哪了吗？
 
+GitHub: [LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills)
+
 如果你长期用 Claude Code 写项目，应该会遇到一个很熟悉的时刻：
 
 你隔了三天回到一个项目，问 AI：“支付这块做到哪了？”
@@ -243,3 +245,6 @@ Synapse v1.5 的目标很小，也很明确：
 
 不是为了炫技，而是为了少一点考古，多一点继续。
 
+---
+
+项目地址：[https://github.com/LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills)

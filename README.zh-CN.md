@@ -1,5 +1,9 @@
 # Synapse Graph Skills
 
+> v1.5 产品发布博客：[Synapse v1.5：给 Claude Code 的轻量化图记忆 Skill](docs/synapse-v1.5-release-blog.zh-CN.md)
+>
+> GitHub：[LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills)
+
 ## v1.5 Skill-First 发布候选
 
 Synapse v1.5 的定位是 Claude Code 个人工程记忆工具，而不是 MCP、服务端平台或向量数据库。四个 Skill 继续独立安装，`synapse-graph-memory` 是核心。
