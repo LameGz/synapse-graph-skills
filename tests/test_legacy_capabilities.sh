@@ -37,6 +37,10 @@ grep -Eq '"paths"|"partial"|"error"' "$TMP_ROOT/trace.out"
 )
 test -f "$PROJECT_COPY/meta/proj_project.md"
 grep -q "type: project" "$PROJECT_COPY/meta/proj_project.md"
+test -f "$PROJECT_COPY/scripts/generate_memory_map.py"
+test -f "$PROJECT_COPY/scripts/memory_inbox.py"
+test -f "$PROJECT_COPY/scripts/project_resume.py"
+test -f "$PROJECT_COPY/scripts/auto_observe.py"
 
 bash "$SKILL/scripts/synapse_note.sh" --project "$PROJECT_COPY" --text "[mod_auth-api] Added login regression note" --edge-mode none --auto-confirm > "$TMP_ROOT/auto-confirm.out"
 grep -q "Auto-recorded" "$TMP_ROOT/auto-confirm.out"

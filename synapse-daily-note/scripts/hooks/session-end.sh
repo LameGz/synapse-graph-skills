@@ -412,6 +412,7 @@ fi
 
 # ─── Step 5: Auto-observe & auto-record (V3.4) ──────────────────────
 AUTO_OBSERVE_SCRIPT="${PROJECT_ROOT}/scripts/auto_observe.py"
+MEMORY_INBOX_SCRIPT="${PROJECT_ROOT}/scripts/memory_inbox.py"
 AUTO_PROPOSAL_DIR="${PROJECT_ROOT}/.claude/.synapse_cache/auto-proposals"
 AUTO_CONFIRM_THRESHOLD=70
 
@@ -500,6 +501,12 @@ print(f'  {applied}/{len(data[\"proposals\"])} proposals auto-applied')
       low_count=$(python3 -c "import json; print(len(json.load(open('${AUTO_PROPOSAL_DIR}/needs_review.json'))['proposals']))" 2>/dev/null || echo 0)
 
       if [ "$low_count" -gt 0 ]; then
+        if [ -f "$MEMORY_INBOX_SCRIPT" ]; then
+          inbox_result=$(python3 "$MEMORY_INBOX_SCRIPT" add --project "$PROJECT_ROOT" --proposal "${AUTO_PROPOSAL_DIR}/needs_review.json" 2>&1 || true)
+        else
+          inbox_result="Memory inbox unavailable; review ${AUTO_PROPOSAL_DIR}/needs_review.json"
+        fi
+        echo "  $inbox_result"
         echo ""
         echo "⚠  Needs Review (confidence < ${AUTO_CONFIRM_THRESHOLD}%):"
         echo "─────────────────────────────────────────"

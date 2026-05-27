@@ -228,11 +228,37 @@ bash scripts/init.sh --project ./my-project --force
 ### generate_memory_map.sh
 
 ```bash
-# Rebuild both MAP formats
+# Fast rebuild both MAP formats
 bash scripts/generate_memory_map.sh --project .
 
-# MD only (skip JSON)
-bash scripts/generate_memory_map.sh --project . --format md
+# Re-parse one changed node and reuse existing MAP data for the rest
+bash scripts/generate_memory_map.sh --project . --changed feat_login.md
+
+# Rebuild MAP and sync the optional SQLite cache
+bash scripts/generate_memory_map.sh --project . --full --db
+```
+
+### project_resume.py
+
+```bash
+# Restore project context before continuing work
+python scripts/project_resume.py --project .
+
+# Narrow the resume to one domain and emit JSON for tooling
+python scripts/project_resume.py --project . --focus payment --json
+```
+
+### memory_inbox.py
+
+```bash
+# Review low-confidence auto-observed memory proposals
+python scripts/memory_inbox.py list --project .
+
+# Apply reviewed proposals into meta/*.md nodes
+python scripts/memory_inbox.py apply --project . --limit 5
+
+# Clear the queue after deciding not to apply pending proposals
+python scripts/memory_inbox.py clear --project .
 ```
 
 ### doctor.sh

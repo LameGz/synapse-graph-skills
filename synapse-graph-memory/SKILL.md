@@ -29,7 +29,7 @@ For the full node specification, critical rules, and common mistakes, see `refer
 | Natural-language memory write | `synapse_note.sh --text "..."` (one command: ingest → suggest → apply → rebuild → doctor) |
 | Review queued memory | `memory_inbox.py list --project <path>` then `memory_inbox.py apply --project <path>` |
 | Resume project context | `project_resume.py --project <path>` (MAP-first project recovery) |
-| Rebuild index | Auto-run by session-end hook; manual: `generate_memory_map.sh` |
+| Rebuild index | Auto-run by session-end hook; manual full rebuild: `generate_memory_map.sh --full`; changed-node fast path: `generate_memory_map.sh --changed <node>.md` |
 | Health check | `doctor.sh` — validates frontmatter, dead links, orphans, oversized nodes |
 | Initialize project | `init.sh` — auto-detect stack, generate skeleton nodes |
 

@@ -57,8 +57,8 @@ if [ ! -f "$MAP_SCRIPT" ] && [ -f "${SKILL_SCRIPTS}/generate_memory_map.sh" ]; t
   chmod +x "$MAP_SCRIPT" 2>/dev/null || true
 fi
 
-# Copy auxiliary scripts (suggest_edges, etc.)
-for aux in suggest_edges.sh ingest_memory.py apply_memory_proposal.py doctor.sh memory_inbox.py project_resume.py; do
+# Copy auxiliary scripts used by MAP generation, hooks, inbox, resume, and health checks.
+for aux in generate_memory_map.py suggest_edges.sh ingest_memory.py apply_memory_proposal.py doctor.sh memory_inbox.py project_resume.py auto_observe.py db_init.py db_index.py source_scan.py query_timeline.sh watch.sh; do
   src="${SKILL_SCRIPTS}/${aux}"
   dst="${PROJECT_ROOT}/scripts/${aux}"
   if [ ! -f "$dst" ] && [ -f "$src" ]; then

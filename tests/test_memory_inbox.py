@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import importlib.util
 import json
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -107,7 +109,19 @@ None.
         assert data["items"] == []
 
 
+def test_help_includes_examples():
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "Examples:" in result.stdout
+    assert "memory_inbox.py list" in result.stdout
+
+
 if __name__ == "__main__":
     test_add_deduplicates_and_merges_evidence()
     test_apply_item_writes_node_and_removes_from_inbox()
+    test_help_includes_examples()
     print("memory_inbox: OK")

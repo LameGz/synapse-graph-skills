@@ -63,7 +63,7 @@ else
   echo "- tests: OK"
 fi
 
-bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$EXAMPLE_DIR" --full
+SYNAPSE_MAP_GENERATED_AT=1970-01-01T00:00:00Z bash "$SCRIPT_DIR/generate_memory_map.sh" --project "$EXAMPLE_DIR" --full
 echo "- solo-saas map: rebuilt"
 
 bash "$SCRIPT_DIR/doctor.sh" --project "$EXAMPLE_DIR"

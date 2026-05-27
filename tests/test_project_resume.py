@@ -38,7 +38,19 @@ def test_resume_json_mode():
     assert '"recent_changes"' in output
 
 
+def test_help_includes_examples():
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "Examples:" in result.stdout
+    assert "project_resume.py --project" in result.stdout
+
+
 if __name__ == "__main__":
     test_resume_prints_project_context()
     test_resume_json_mode()
+    test_help_includes_examples()
     print("project_resume: OK")

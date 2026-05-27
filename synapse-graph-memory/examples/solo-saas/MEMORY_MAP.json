@@ -1,5 +1,5 @@
 {
-  "generated": "2026-05-27T01:54:28Z",
+  "generated": "1970-01-01T00:00:00Z",
   "stats": {
     "nodes": 6,
     "tags": 18,
@@ -33,6 +33,7 @@
           "summary": "Admin visibility."
         }
       ],
+      "open_issues": [],
       "tokens": 211,
       "rel": "meta/feat_admin-notification.md",
       "path": "meta/feat_admin-notification.md"
@@ -67,6 +68,9 @@
           "summary": "Natural-language memory ingestion."
         }
       ],
+      "open_issues": [
+        "Add frontend password strength validation."
+      ],
       "tokens": 237,
       "rel": "meta/feat_login.md",
       "path": "meta/feat_login.md"
@@ -100,6 +104,9 @@
           "date": "2026-05-12",
           "summary": "Subscription payment integration."
         }
+      ],
+      "open_issues": [
+        "Add downgrade flow for canceled plans."
       ],
       "tokens": 242,
       "rel": "meta/feat_subscription.md",
@@ -137,6 +144,7 @@
           "summary": "Login integration."
         }
       ],
+      "open_issues": [],
       "tokens": 229,
       "rel": "meta/mod_auth-api.md",
       "path": "meta/mod_auth-api.md"
@@ -173,6 +181,7 @@
           "summary": "Billing flow."
         }
       ],
+      "open_issues": [],
       "tokens": 221,
       "rel": "meta/mod_payment.md",
       "path": "meta/mod_payment.md"
@@ -209,6 +218,7 @@
           "summary": "Subscription rollout."
         }
       ],
+      "open_issues": [],
       "tokens": 226,
       "rel": "meta/mod_user-account.md",
       "path": "meta/mod_user-account.md"
