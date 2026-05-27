@@ -28,17 +28,51 @@ fi
 DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"
 STALE_MAP="${PROJECT_ROOT}/.claude/.synapse_cache/.stale_map"
 
+pick_python() {
+  local candidate
+  for candidate in "${PYTHON_BIN:-}" python3 python; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c "import json, sqlite3" >/dev/null 2>&1 || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+PY_BIN="$(pick_python || true)"
+
+python_path() {
+  local path="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$path" 2>/dev/null || printf '%s\n' "$path"
+  else
+    printf '%s\n' "$path"
+  fi
+}
+
 check_staleness() {
-  if [ ! -f "$DB_PATH" ] || ! command -v python3 >/dev/null 2>&1; then
+  if [ ! -f "$DB_PATH" ] || [ -z "$PY_BIN" ]; then
     echo "SQLite cache not found. Run generate_memory_map.sh --db first."
     return
   fi
 
-  python3 -c "
+  local project_root_py db_path_py stale_map_py
+  project_root_py="$(python_path "$PROJECT_ROOT")"
+  db_path_py="$(python_path "$DB_PATH")"
+  stale_map_py="$(python_path "$STALE_MAP")"
+
+  SYNAPSE_PROJECT_ROOT="$project_root_py" \
+  SYNAPSE_DB_PATH="$db_path_py" \
+  SYNAPSE_STALE_MAP="$stale_map_py" \
+  "$PY_BIN" -c "
 import json, os, sqlite3, sys
 
-conn = sqlite3.connect('${DB_PATH}')
-stale_map_file = '${STALE_MAP}'
+project_root = os.environ['SYNAPSE_PROJECT_ROOT']
+db_path = os.environ['SYNAPSE_DB_PATH']
+stale_map_file = os.environ['SYNAPSE_STALE_MAP']
+
+conn = sqlite3.connect(db_path)
 
 prev_hashes = {}
 if os.path.exists(stale_map_file):
@@ -56,7 +90,7 @@ new_stale = []
 for node_id, file_path, updated in nodes:
     if not file_path:
         continue
-    full_path = os.path.join('${PROJECT_ROOT}', file_path)
+    full_path = os.path.join(project_root, file_path)
     if not os.path.exists(full_path):
         continue
     try:
@@ -88,7 +122,7 @@ if stale_count > 0:
     for node_id, file_path, _ in new_stale:
         print(f'  {node_id} — source changed: {file_path}')
 else:
-    print('All memory nodes up-to-date.')
+    print('No stale nodes. All memory nodes up-to-date.')
 " 2>&1
 }
 
