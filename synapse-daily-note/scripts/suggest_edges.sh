@@ -17,15 +17,77 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
+if [ -x /usr/bin/find ]; then
+  find() { /usr/bin/find "$@"; }
+fi
+if [ -x /usr/bin/sort ]; then
+  sort() { /usr/bin/sort "$@"; }
+fi
+if [ -x /usr/bin/head ]; then
+  head() { /usr/bin/head "$@"; }
+fi
+if [ -x /usr/bin/xargs ]; then
+  xargs() { /usr/bin/xargs "$@"; }
+fi
+
+ORIGINAL_ARGS=("$@")
+MODE="suggest"
+PROJECT_ROOT_OVERRIDE=""
+PROPOSAL=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --check-drift)
+      MODE="drift"
+      shift
+      ;;
+    --auto)
+      MODE="auto"
+      shift
+      ;;
+    --project)
+      PROJECT_ROOT_OVERRIDE="$2"
+      shift 2
+      ;;
+    --proposal)
+      PROPOSAL="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
+if [ -n "$PROJECT_ROOT_OVERRIDE" ]; then
+  PROJECT_ROOT="$(cd "$PROJECT_ROOT_OVERRIDE" && pwd)"
+else
+  PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
+fi
 META_DIR="${PROJECT_ROOT}/meta"
 
-MODE="suggest"
-if [ "${1:-}" = "--check-drift" ]; then
-  MODE="drift"
-elif [ "${1:-}" = "--auto" ]; then
-  MODE="auto"
+PY_ENGINE="${SCRIPT_DIR}/suggest_edges.py"
+pick_python() {
+  local candidate
+  for candidate in "${PYTHON_BIN:-}" python3 python; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c "import json" >/dev/null 2>&1 || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+PY_BIN="$(pick_python || true)"
+
+if [ -z "${SYNAPSE_LEGACY_SUGGEST:-}" ] \
+  && [ "$MODE" = "suggest" ] \
+  && [ -n "$PY_BIN" ] \
+  && [ -f "$PY_ENGINE" ]; then
+  exec "$PY_BIN" "$PY_ENGINE" "${ORIGINAL_ARGS[@]}"
 fi
 
 if [ ! -d "$META_DIR" ]; then
@@ -275,6 +337,8 @@ suggest_edges() {
 
   local suggestions=0
   local rel_a rel_b ids_a type_a value_a fm_b deps_b id_a id_b tags_b
+  local suggestion_key
+  declare -A SEEN_SUGGESTIONS
 
   for rel_a in "${!NODE_IDS[@]}"; do
     ids_a="${NODE_IDS[$rel_a]}"
@@ -294,6 +358,9 @@ suggest_edges() {
             id_a=$(basename "$rel_a" .md)
             id_b=$(basename "$rel_b" .md)
             tags_b="${NODE_TAGS[$rel_b]:-}"
+            suggestion_key="${id_b}|${id_a}"
+            [ "${SEEN_SUGGESTIONS[$suggestion_key]:-}" = "1" ] && continue
+            SEEN_SUGGESTIONS["$suggestion_key"]=1
 
             echo "💡 Suggested edge: $id_b depends_on $id_a"
             echo "   Reason: $id_b's Connection Points reference $value_a ($type_a)"
@@ -331,6 +398,9 @@ suggest_edges() {
           if ! echo "$deps_b" | grep -qF "$rel_a"; then
             id_a=$(basename "$rel_a" .md)
             id_b=$(basename "$rel_b" .md)
+            suggestion_key="${id_b}|${id_a}"
+            [ "${SEEN_SUGGESTIONS[$suggestion_key]:-}" = "1" ] && continue
+            SEEN_SUGGESTIONS["$suggestion_key"]=1
 
             echo "💡 Suggested edge: $id_b depends_on $id_a"
             echo "   Reason: shared tag '$tag' (weak signal — confirm manually)"
