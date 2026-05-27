@@ -81,12 +81,19 @@ OUTPUT="${PROJECT_ROOT}/MEMORY_MAP.md"
 CACHE_DIR="${PROJECT_ROOT}/.claude/.synapse_cache"
 
 PY_ENGINE="${SCRIPT_DIR}/generate_memory_map.py"
-PY_BIN=""
-if command -v python3 >/dev/null 2>&1; then
-  PY_BIN="python3"
-elif command -v python >/dev/null 2>&1; then
-  PY_BIN="python"
-fi
+pick_python() {
+  local candidate
+  for candidate in "${PYTHON_BIN:-}" python3 python; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c "import json" >/dev/null 2>&1 || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+PY_BIN="$(pick_python || true)"
 
 # Set DB_PATH after PROJECT_ROOT is resolved
 if [ "$USE_DB" = true ]; then
@@ -148,8 +155,8 @@ if [ -n "$CHANGED_FILE" ] && [ -f "$META_DIR/$CHANGED_FILE" ]; then
 
   MAP_FILE="${PROJECT_ROOT}/MEMORY_MAP.json"
 
-  if [ -f "$MAP_FILE" ] && command -v python3 >/dev/null 2>&1; then
-    python3 -c "
+  if [ -f "$MAP_FILE" ] && [ -n "$PY_BIN" ]; then
+    "$PY_BIN" -c "
 import json, sys
 
 node_id = '${node_id}'
@@ -257,12 +264,8 @@ bfs_trace() {
   local max_depth="${3:-4}"
   local max_width="${4:-3}"
 
-  local trace_python=""
-  if command -v python3 >/dev/null 2>&1; then
-    trace_python="python3"
-  elif command -v python >/dev/null 2>&1; then
-    trace_python="python"
-  else
+  local trace_python="$PY_BIN"
+  if [ -z "$trace_python" ]; then
     echo '{"error": "python required for bfs_trace"}' >&2
     return 1
   fi
@@ -1243,24 +1246,24 @@ echo "MEMORY_MAP.md regenerated: ${#ALL_NODES[@]} nodes, ${#TAG_MAP[@]} tags, ${
 echo "MEMORY_MAP.json regenerated: ${#ALL_NODES[@]} nodes."
 
 # ─── SQLite cache sync ──────────────────────────────────────────────────
-if [ "$USE_DB" = true ] && [ -n "$DB_PATH" ] && command -v python3 >/dev/null 2>&1; then
+if [ "$USE_DB" = true ] && [ -n "$DB_PATH" ] && [ -n "$PY_BIN" ]; then
   DB_INIT_SCRIPT="${SCRIPT_DIR}/db_init.py"
   DB_INDEX_SCRIPT="${SCRIPT_DIR}/db_index.py"
 
   if [ -f "$DB_INDEX_SCRIPT" ]; then
     # Ensure DB exists
     if [ ! -f "$DB_PATH" ]; then
-      python3 "$DB_INIT_SCRIPT" --db "$DB_PATH" 2>&1 || true
+        "$PY_BIN" "$DB_INIT_SCRIPT" --db "$DB_PATH" 2>&1 || true
     fi
 
     # Incremental or full sync
     if [ "$FULL_REBUILD" = true ]; then
-      python3 "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --full 2>&1
+      "$PY_BIN" "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --full 2>&1
     elif [ -n "$CHANGED_FILE" ]; then
       node_id=$(basename "$CHANGED_FILE" .md)
-      python3 "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --changed "$node_id" 2>&1
+      "$PY_BIN" "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --changed "$node_id" 2>&1
     else
-      python3 "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" 2>&1
+      "$PY_BIN" "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" 2>&1
     fi
   fi
 fi

@@ -17,16 +17,22 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-PYTHON_BIN="${PYTHON_BIN:-}"
+pick_python() {
+    local candidate
+    for candidate in "${PYTHON_BIN:-}" python3 python; do
+        [ -n "$candidate" ] || continue
+        command -v "$candidate" >/dev/null 2>&1 || continue
+        "$candidate" -c "import json" >/dev/null 2>&1 || continue
+        printf '%s\n' "$candidate"
+        return 0
+    done
+    return 1
+}
+
+PYTHON_BIN="$(pick_python || true)"
 if [ -z "$PYTHON_BIN" ]; then
-    if command -v python3 >/dev/null 2>&1; then
-        PYTHON_BIN="python3"
-    elif command -v python >/dev/null 2>&1; then
-        PYTHON_BIN="python"
-    else
-        echo -e "${RED}ERROR: python or python3 is required${NC}" >&2
-        exit 1
-    fi
+    echo -e "${RED}ERROR: runnable python or python3 is required${NC}" >&2
+    exit 1
 fi
 
 SKILL=""
