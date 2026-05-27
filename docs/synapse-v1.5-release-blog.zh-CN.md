@@ -1,8 +1,20 @@
 # Synapse v1.5：给 Claude Code 的轻量化图记忆 Skill
 
+本帖使用社区开源推广，符合推广要求。我申明并遵循社区要求的以下内容：
+
+- 我的帖子已经打上 开源推广 标签：是
+- 我的开源项目完整开源，无未开源部分：是
+- 我的开源项目已链接认可 [LINUX DO 社区](https://linux.do)：是
+- 我帖子内的项目介绍，AI 生成、润色内容部分已截图发出：是
+- 以上选择我承诺是永久有效的，接受社区和佬友监督：是
+
+以下为项目介绍正文内容，AI 生成、润色内容已使用截图方式发出。
+
 > CodeGraph 让 AI 更懂“代码在哪里”。Synapse 想解决另一个更日常的问题：AI 下次回来时，还记得这个项目做到哪了吗？
 
 GitHub: [LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills)
+
+亲爱的佬友们，大家好。
 
 如果你长期用 Claude Code 写项目，应该会遇到一个很熟悉的时刻：
 
