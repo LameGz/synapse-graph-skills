@@ -1,6 +1,6 @@
 # Synapse Graph Skills
 
-## V1.5 Skill-First Release Candidate
+## v1.5 Skill-First Release Candidate
 
 Synapse v1.5 is a lightweight Claude Code personal engineering memory suite. The four skills remain independently installable, while `synapse-graph-memory` is the core product.
 
@@ -21,30 +21,60 @@ GitHub: [LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-sk
 
 ## Evolution
 
-Synapse has evolved through four generations, with V3.1-V3.4 adding major capabilities:
+Synapse now uses a single public product version line: `v1.0` through `v1.5`. Older internal generation labels are kept only in [EVOLUTION.md](EVOLUTION.md) for historical context.
 
 ```
-V1 (2024)           V2 (2025)          V3.0 (2026-05)      V3.1–V3.4 (2026-05) ← Current
-────────────────    ───────────────    ────────────────    ──────────────────────
-Flat Markdown        Monolithic Agent    4 Skills + Graph    +SQLite +Full-Stack +Auto-Write
-grep search          Keyword search      3-Layer BFS         Incremental MAP
-No edges             Implicit edges      Explicit edges      FTS5 BM25 search
-~10 nodes            ~15 nodes           30+ nodes           Stale detection
-                                                            AI autonomous writing
+v1.0                 v1.1               v1.2                v1.3
+────────────────     ───────────────    ────────────────    ─────────────────
+4 Skills + Graph     Incremental MAP    SQLite FTS5 cache   7 full-stack nodes
+3-layer loading      Source anchors     Stale detection     BFS link tracing
+
+v1.4                 v1.5 ← Current
+────────────────     ─────────────────────────────────────────────
+AI auto-write        Skill-first productization
+Session-end flow     Memory Inbox + Project Resume + release checks
 ```
 
-**V3.1** — Incremental MAP updates + `source_scan.py` AST interface extraction  
-**V3.2** — SQLite FTS5 cache + `watch.sh` real-time stale detection  
-**V3.3** — Full-stack node types (db_/api_/ui_/dep_) + `bfs_trace()` link queries + `init.sh --fullstack`  
-**V3.4** — AI autonomous memory writing — no more manual `/记录一下`
+- **v1.1** — Incremental MAP updates + `source_scan.py` AST interface extraction
+- **v1.2** — SQLite FTS5 cache + `watch.sh` real-time stale detection
+- **v1.3** — Seven full-stack node types + `bfs_trace()` link queries + `init.sh --fullstack`
+- **v1.4** — AI autonomous memory writing — no more manual `/记录一下`
+- **v1.5** — Skill-first productization with Memory Inbox, Project Resume, and release hardening
 
 Full evolution log: [EVOLUTION.md](EVOLUTION.md)
 
 ---
 
-## What's New in V3.1–V3.4
+## What's New in v1.5
 
-### SQLite FTS5 Cache (V3.2)
+### Memory Inbox
+
+Low-confidence auto-observed memory proposals now persist in `.synapse/inbox.json` instead of a transient cache file. You can list, apply, deduplicate, and clear pending proposals before they become durable project memory.
+
+```bash
+python synapse-graph-memory/scripts/memory_inbox.py list
+python synapse-graph-memory/scripts/memory_inbox.py apply --id <proposal-id>
+```
+
+### Project Resume
+
+`project_resume.py` restores project context from `MEMORY_MAP.json` first, then summarizes current focus, recent changes, open issues, and recommended next actions. This is the productized path for prompts like "continue this project" or "where did we leave off?"
+
+```bash
+python synapse-graph-memory/scripts/project_resume.py --project-root .
+```
+
+### Release Hardening
+
+The release check now covers MAP generation, optional SQLite paths, Inbox, Resume, full-stack fixtures, legacy capability compatibility, and documentation consistency.
+
+```bash
+bash synapse-graph-memory/scripts/release_check.sh
+```
+
+## v1.1-v1.4 Capability Timeline
+
+### SQLite FTS5 Cache (v1.2)
 
 MEMORY_MAP is now backed by a SQLite database with full-text search. Tag lookup, keyword search, and affinity queries use BM25 ranking instead of bash grep. Markdown files remain source of truth — SQLite is a derived cache.
 
@@ -53,12 +83,15 @@ generate_memory_map.sh --db      # Sync to SQLite
 query_timeline.sh --tag payment  # FTS5-powered, O(log n)
 ```
 
-### Full-Stack Node Types (V3.3)
+### Full-Stack Node Types (v1.3)
 
-Beyond `mod_` (module) and `feat_` (feature), four new node types track the complete stack:
+Synapse formally supports seven engineering-memory node types:
 
 | Type | Prefix | Example |
 |------|--------|---------|
+| Project | `proj_` | `proj_project` — project anchor, status, scope |
+| Module | `mod_` | `mod_auth` — service or package boundary |
+| Feature | `feat_` | `feat_checkout` — business capability |
 | Database Table | `db_` | `db_orders` — columns, indexes, FK relationships |
 | API Endpoint Group | `api_` | `api_payment-routes` — endpoints per router file |
 | UI Page | `ui_` | `ui_checkout-page` — states, API calls |
@@ -68,7 +101,7 @@ Beyond `mod_` (module) and `feat_` (feature), four new node types track the comp
 init.sh --fullstack   # Scan DB schema + API routes + UI pages + deployment config
 ```
 
-### Link-Trace Queries (V3.3)
+### Link-Trace Queries (v1.3)
 
 Ask "how does the payment flow connect from button to database?" and get a full chain:
 
@@ -78,7 +111,7 @@ ui_checkout-page → api_payment-routes → db_orders → dep_container-config
 
 Powered by `bfs_trace()` — state-machine BFS with backtrack pruning. Allows multi-hop within same type (microservice gateways) and skip-level traversal.
 
-### AI Autonomous Writing (V3.4)
+### AI Autonomous Writing (v1.4)
 
 The biggest UX change: **you no longer need to remember to type `/记录一下`.** AI observes conversation + file changes, auto-generates memory proposals, and high-confidence entries (≥70%) are applied silently at session end.
 
@@ -152,12 +185,12 @@ Scans DB schema, API routes, UI pages, and deployment config in one pass.
 
 ### Log progress (manual or automatic)
 
-**Manual** (V3.0):
+**Manual** (v1.0):
 ```
 User: 记录一下：接好了 POST /api/v1/auth/login，返回 JWT token
 ```
 
-**Automatic** (V3.4): Just code and talk normally. AI observes file changes and conversation, auto-records high-confidence entries at session end. No command needed.
+**Automatic** (v1.4+): Just code and talk normally. AI observes file changes and conversation, auto-records high-confidence entries at session end. No command needed.
 
 ### Query status
 
@@ -173,7 +206,7 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 
 ## Eval & Benchmarks
 
-### V3.0 Baseline (8-node SaaS fixture, deepseek-v4-pro)
+### v1.0 Baseline (8-node SaaS fixture, deepseek-v4-pro)
 
 | Metric | With Skill | Without Skill | Delta |
 |--------|-----------|---------------|-------|
@@ -181,9 +214,9 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 | Irrelevant Files | **0** | 4.5 | key win |
 | Assertion Pass Rate | **100%** | 62.5% | — |
 
-### V3.2 SQLite Performance (30-node fixture, measured 2026-05-24)
+### v1.2 SQLite Performance (30-node fixture, measured 2026-05-24)
 
-| Operation | V3.0 (bash+grep) | V3.2 (SQLite FTS5) | Speedup |
+| Operation | v1.0 (bash+grep) | v1.2 (SQLite FTS5) | Speedup |
 |-----------|-----------------|-------------------|---------|
 | Tag lookup | ~120ms (grep MAP) | ~5ms (FTS5) | **~24×** |
 | Full-text search | ~200ms (bash loop) | ~5ms (BM25) | **~40×** |
@@ -191,7 +224,7 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 | Doctor health check | ~350ms (bash loop) | ~120ms (SQL JOIN) | **~3×** |
 | MAP full rebuild + SQLite sync | ~2.1s (JSON only) | ~1.6s (JSON + SQLite) | **~1.3×** |
 
-### V3.4 Auto-Observe Accuracy (simulated 50-session run)
+### v1.4 Auto-Observe Accuracy (simulated 50-session run)
 
 | Signal Type | Precision | Recall | Notes |
 |-------------|-----------|--------|-------|
@@ -218,7 +251,7 @@ synapse-graph-skills/
 ├── synapse-daily-note/       # NL → memory write pipeline
 ├── synapse-init/             # Cold-start wizard (thin wrapper)
 ├── docs/                     # Architecture, contributing, skills overview, specs, plans
-├── EVOLUTION.md              # Full version evolution log (V1 → V3.4)
+├── EVOLUTION.md              # Full version evolution log (internal generations + v1.0-v1.5)
 ├── EVAL_REPORT.md            # Benchmark results
 ├── USAGE.md                  # Detailed usage guide
 ├── README.md                 # This file
@@ -243,4 +276,4 @@ MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-**Synapse Graph Skills (V3)** — graph-topology memory so your AI assistant knows what you built last week without you having to explain it again. From V1 flat files to V2 monolithic agent, to V3 graph topology + Skills architecture — every iteration answers the same question: **context should not grow with module count.**
+**Synapse Graph Skills (v1.5)** — graph-topology memory so your AI assistant knows what you built last week without you having to explain it again. From early flat files to the current skill-first graph memory suite, every iteration answers the same question: **context should not grow with module count, and project memory should not depend on humans remembering to record it.**

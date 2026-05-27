@@ -14,7 +14,7 @@
 
 Synapse Graph Skills follows [Semantic Versioning](https://semver.org/). Each skill within the repo shares the repo version but may be released independently.
 
-## Latest Release
+## Previous Releases
 
 ### v1.4.0 — 2026-05-24
 
@@ -22,13 +22,11 @@ Synapse Graph Skills follows [Semantic Versioning](https://semver.org/). Each sk
 
 - **auto_observe.py** — Signal extraction from git diff + conversation patterns (Chinese + English regex). Maps 16 source file patterns → node IDs. Generates ranked JSON proposals with confidence scores and evidence.
 - **synapse_note.sh --auto-confirm** — Skips interactive prompts, enabling silent AI writes through the full pipeline.
-- **session-end hook V3.4** — Auto-collects proposals, splits by 70% confidence threshold, auto-applies high-confidence entries, displays low-confidence for review.
+- **session-end hook v1.4** — Auto-collects proposals, splits by 70% confidence threshold, auto-applies high-confidence entries, displays low-confidence for review.
 - **SKILL.md Autonomous Memory Writing** — Behavior rules telling AI when to auto-write, how, and when not to.
 - **critical-rules.md audit rules** — Auto-record markers (`<!-- auto-recorded, confidence: N% -->`), grep audit commands, rollback procedures.
 
 ---
-
-## Previous Releases
 
 ### v1.3.0 — 2026-05-24
 
