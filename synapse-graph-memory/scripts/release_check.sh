@@ -35,14 +35,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKILL_DIR/.." && pwd)"
 EXAMPLE_DIR="$SKILL_DIR/examples/solo-saas"
-PYTHON_BIN="${PYTHON_BIN:-}"
+pick_python() {
+  local candidate
+  for candidate in "${PYTHON_BIN:-}" python3 python; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c "import json" >/dev/null 2>&1 || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+PYTHON_BIN="$(pick_python || true)"
 if [ -z "$PYTHON_BIN" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN="python3"
-  else
-    PYTHON_BIN="python"
-  fi
+  echo "Error: runnable python or python3 is required" >&2
+  exit 1
 fi
+export PYTHON_BIN
 
 cd "$REPO_ROOT"
 
