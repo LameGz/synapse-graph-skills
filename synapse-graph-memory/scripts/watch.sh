@@ -114,6 +114,7 @@ conn.commit()
 stale_count = conn.execute('SELECT COUNT(*) FROM staleness').fetchone()[0]
 conn.close()
 
+os.makedirs(os.path.dirname(stale_map_file), exist_ok=True)
 with open(stale_map_file, 'w') as f:
     json.dump(new_hashes, f)
 
