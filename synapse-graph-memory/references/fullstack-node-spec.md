@@ -1,9 +1,11 @@
 # Full-Stack Node Specification (V3.3)
 
 > Loaded on-demand when full-stack node types (db_/api_/ui_/dep_) are present.
-> For base node types (mod_/feat_/proj_), see `node-spec.md`.
+> For base node types (proj_/mod_/feat_), see `node-spec.md`.
 
 ## Node Types
+
+Synapse has seven node types overall: `project`, `module`, `feature`, plus the four full-stack types below.
 
 | Prefix | Type | Purpose | Granularity |
 |--------|------|---------|-------------|

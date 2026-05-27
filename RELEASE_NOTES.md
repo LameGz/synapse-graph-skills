@@ -1,5 +1,13 @@
 # Release Notes
 
+## v1.5.0 Skill-First Memory Release Candidate
+
+- Adds `memory_inbox.py` for persistent review of low-confidence memory proposals in `.synapse/inbox.json`.
+- Adds `project_resume.py` for MAP-first project context restoration.
+- Fixes `generate_memory_map.sh --db` so it uses the fast Python MAP engine before syncing the optional SQLite cache.
+- Clarifies the seven node types and changes initialization to create `proj_project` as the project-level anchor.
+- Extends release checks with Inbox, Resume, legacy capability, and fast MAP/edge regression tests.
+
 ## Versioning
 
 Synapse Graph Skills follows [Semantic Versioning](https://semver.org/). Each skill within the repo shares the repo version but may be released independently.

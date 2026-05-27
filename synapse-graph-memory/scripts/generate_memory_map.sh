@@ -61,7 +61,7 @@ while [[ $# -gt 0 ]]; do
       TRACE_FROM="$2"
       shift 2
       ;;
-    --db) USE_DB=true; DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"; shift ;;
+    --db) USE_DB=true; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -88,18 +88,40 @@ elif command -v python >/dev/null 2>&1; then
   PY_BIN="python"
 fi
 
-if [ -z "${SYNAPSE_LEGACY_MAP:-}" ] \
-  && [ -n "$PY_BIN" ] \
-  && [ -f "$PY_ENGINE" ] \
-  && [ "$USE_DB" = false ] \
-  && [ -z "$TRACE_FROM" ] \
-  && [ -z "$TRAVERSE_TYPES" ]; then
-  exec "$PY_BIN" "$PY_ENGINE" "${ORIGINAL_ARGS[@]}"
-fi
-
 # Set DB_PATH after PROJECT_ROOT is resolved
 if [ "$USE_DB" = true ]; then
   DB_PATH="${PROJECT_ROOT}/.synapse/cache/memory.db"
+fi
+
+if [ -z "${SYNAPSE_LEGACY_MAP:-}" ] \
+  && [ -n "$PY_BIN" ] \
+  && [ -f "$PY_ENGINE" ] \
+  && [ -z "$TRACE_FROM" ] \
+  && [ -z "$TRAVERSE_TYPES" ]; then
+  PY_ARGS=()
+  for arg in "${ORIGINAL_ARGS[@]}"; do
+    [ "$arg" = "--db" ] && continue
+    PY_ARGS+=("$arg")
+  done
+  "$PY_BIN" "$PY_ENGINE" "${PY_ARGS[@]}"
+  if [ "$USE_DB" = true ]; then
+    DB_INIT_SCRIPT="${SCRIPT_DIR}/db_init.py"
+    DB_INDEX_SCRIPT="${SCRIPT_DIR}/db_index.py"
+    if [ -f "$DB_INDEX_SCRIPT" ]; then
+      if [ ! -f "$DB_PATH" ]; then
+        "$PY_BIN" "$DB_INIT_SCRIPT" --db "$DB_PATH" 2>&1 || true
+      fi
+      if [ "$FULL_REBUILD" = true ]; then
+        "$PY_BIN" "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --full 2>&1
+      elif [ -n "$CHANGED_FILE" ]; then
+        node_id=$(basename "$CHANGED_FILE" .md)
+        "$PY_BIN" "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" --changed "$node_id" 2>&1
+      else
+        "$PY_BIN" "$DB_INDEX_SCRIPT" --project "$PROJECT_ROOT" --db "$DB_PATH" 2>&1
+      fi
+    fi
+  fi
+  exit 0
 fi
 
 mkdir -p "$CACHE_DIR"
@@ -235,12 +257,17 @@ bfs_trace() {
   local max_depth="${3:-4}"
   local max_width="${4:-3}"
 
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo '{"error": "python3 required for bfs_trace"}' >&2
+  local trace_python=""
+  if command -v python3 >/dev/null 2>&1; then
+    trace_python="python3"
+  elif command -v python >/dev/null 2>&1; then
+    trace_python="python"
+  else
+    echo '{"error": "python required for bfs_trace"}' >&2
     return 1
   fi
 
-  python3 -c "
+  "$trace_python" -c "
 import json, os, sys
 
 start_node = '${start_node}'
@@ -268,14 +295,17 @@ else:
     if not os.path.exists(map_file):
         print(json.dumps({'error': 'No MAP or SQLite found'}))
         sys.exit(0)
-    with open(map_file) as f:
+    with open(map_file, encoding='utf-8-sig') as f:
         map_data = json.load(f)
-    nodes = map_data.get('nodes', {})
+    raw_nodes = map_data.get('nodes', [])
+    nodes = {n.get('id'): n for n in raw_nodes}
+    def normalize_edge(edge):
+        return str(edge).replace('meta/', '').replace('.md', '')
     def get_type(node_id):
         return nodes.get(node_id, {}).get('type', 'unknown')
     def get_depends_on(node_id):
         node = nodes.get(node_id, {})
-        return list(set(node.get('depends_on', []) + node.get('auto_linked', [])))
+        return list(set(normalize_edge(edge) for edge in node.get('depends_on', []) + node.get('auto_linked', [])))
 
 if get_type(start_node) == 'unknown':
     print(json.dumps({'error': f'Node not found: {start_node}'}))

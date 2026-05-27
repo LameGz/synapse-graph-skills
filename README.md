@@ -1,5 +1,14 @@
 # Synapse Graph Skills
 
+## V1.5 Skill-First Release Candidate
+
+Synapse v1.5 is a lightweight Claude Code personal engineering memory suite. The four skills remain independently installable, while `synapse-graph-memory` is the core product.
+
+- Seven node types: `project`, `module`, `feature`, `database_table`, `api_endpoint_group`, `ui_page`, `deployment`.
+- Memory Inbox queues low-confidence auto-observed memories in `.synapse/inbox.json`.
+- Project Resume restores current focus, recent changes, open issues, and next actions from `MEMORY_MAP.json`.
+- SQLite remains an optional derived cache via `--db`; codegraph-style integration is future bridge work, not a v1.5 dependency.
+
 **Engineering memory system for solo full-stack developers.** Graph-topology memory with SQLite FTS5, full-stack node types (DB → API → UI → Deploy), and AI-autonomous writing — never load all memory at once, never forget to record.
 
 [中文文档](README.zh-CN.md) | [Usage Guide](USAGE.md) | [Architecture](docs/architecture.md) | [Skills Overview](docs/skills-overview.md) | [Evolution Log](EVOLUTION.md)

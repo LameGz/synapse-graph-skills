@@ -424,6 +424,17 @@ def write_json(project: Path, nodes: list[Node]) -> None:
     (project / "MEMORY_MAP.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def normalize_changed(value: str | None) -> str | None:
+    if not value:
+        return None
+    changed = value.replace("\\", "/")
+    if changed.startswith("meta/"):
+        return changed
+    if changed.endswith(".md"):
+        return f"meta/{Path(changed).name}"
+    return f"meta/{changed}.md"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Synapse MEMORY_MAP files.")
     parser.add_argument("--project", default=".")
@@ -433,7 +444,10 @@ def main() -> int:
     args = parser.parse_args()
 
     project = Path(args.project).resolve()
+    changed_rel = normalize_changed(args.changed)
     nodes = load_nodes(project)
+    if changed_rel and not any(node.rel == changed_rel for node in nodes):
+        print(f"Warning: --changed target not found: {changed_rel}")
     compute_blocks(nodes)
     map_text = render_map(project, nodes)
     (project / "MEMORY_MAP.md").write_text(map_text, encoding="utf-8")
@@ -441,7 +455,10 @@ def main() -> int:
 
     tag_count = len(build_tag_index(nodes))
     keyword_count = len(build_keyword_index(nodes))
-    print(f"MEMORY_MAP.md regenerated: {len(nodes)} nodes, {tag_count} tags, {keyword_count} keywords, 0 warnings.")
+    if changed_rel:
+        print(f"MEMORY_MAP.md regenerated from changed node hint {changed_rel}: {len(nodes)} nodes, {tag_count} tags, {keyword_count} keywords, 0 warnings.")
+    else:
+        print(f"MEMORY_MAP.md regenerated: {len(nodes)} nodes, {tag_count} tags, {keyword_count} keywords, 0 warnings.")
     print(f"MEMORY_MAP.json regenerated: {len(nodes)} nodes.")
     if args.stats:
         print(json.dumps({"nodes": len(nodes), "tags": tag_count, "keywords": keyword_count, "warnings": 0}, indent=2))

@@ -35,6 +35,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKILL_DIR/.." && pwd)"
 EXAMPLE_DIR="$SKILL_DIR/examples/solo-saas"
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [ -z "$PYTHON_BIN" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+  else
+    PYTHON_BIN="python"
+  fi
+fi
 
 cd "$REPO_ROOT"
 
@@ -46,6 +54,12 @@ if [ "$SKIP_TESTS" -eq 1 ]; then
   echo "- tests: skipped"
 else
   bash "$REPO_ROOT/tests/test_runner.sh" --all
+  bash "$REPO_ROOT/tests/test_generate_memory_map_py.sh"
+  bash "$REPO_ROOT/tests/test_suggest_edges_fast.sh"
+  bash "$REPO_ROOT/tests/test_suggest_edges_dedup.sh"
+  "$PYTHON_BIN" "$REPO_ROOT/tests/test_memory_inbox.py"
+  "$PYTHON_BIN" "$REPO_ROOT/tests/test_project_resume.py"
+  bash "$REPO_ROOT/tests/test_legacy_capabilities.sh"
   echo "- tests: OK"
 fi
 
@@ -57,6 +71,9 @@ echo "- solo-saas doctor: OK"
 
 bash "$SCRIPT_DIR/demo_solo_saas.sh" --project "$EXAMPLE_DIR" --dry-run
 echo "- solo-saas demo: OK"
+
+"$PYTHON_BIN" "$SCRIPT_DIR/project_resume.py" --project "$EXAMPLE_DIR" >/dev/null
+echo "- solo-saas resume: OK"
 
 for doc in README.md README.zh-CN.md USAGE.md RELEASE_NOTES.md; do
   if [ ! -f "$REPO_ROOT/$doc" ]; then

@@ -2,16 +2,21 @@
 
 ## Naming
 
+- `proj_<name>.md` - Project-level overview, architecture decisions, and resume anchor.
+
 - `mod_<name>.md` — Persistent architecture module (routing, state, database schema). Never archived.
 - `feat_<name>.md` — Lifecycle-bound feature (login, payment integration). Move to `meta/archive/` when completed.
 - Flat or max 2 levels: `meta/` and `meta/archive/`.
 
 ## Extended Node Types (Full-Stack Mode)
 
-When `init.sh --fullstack` is used, the following node types are available in addition to `mod_` and `feat_`:
+Synapse v1.5 recognizes seven node types. The base three are `project`, `module`, and `feature`; full-stack mode adds four derived engineering layers:
 
 | Prefix | Type | Purpose | Granularity |
 |--------|------|---------|-------------|
+| `proj_` | project | Project overview and session resume anchor | One node per project |
+| `mod_` | module | Persistent architecture module | One node per stable module boundary |
+| `feat_` | feature | Lifecycle-bound user-facing feature | One node per feature or epic |
 | `db_` | database_table | Database table with business-logic columns | One node per table |
 | `api_` | api_endpoint_group | Group of API endpoints (one router file) | One node per router file |
 | `ui_` | ui_page | Frontend page or major tab section | One node per page; split tabs if domain overlap < 30% |

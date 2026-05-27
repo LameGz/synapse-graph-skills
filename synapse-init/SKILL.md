@@ -5,6 +5,8 @@ description: 在以下任一情况下激活本技能：用户说"初始化记忆
 
 # Synapse Init
 
+v1.5 product shape: this skill remains an independently installable cold-start entry for the Synapse suite. It should create a `proj_project` project anchor plus module/full-stack nodes, then hand off daily use to `synapse-graph-memory` for retrieval, Memory Inbox review, and Project Resume.
+
 ## Overview
 
 One-command cold-start wizard that bootstraps the Synapse memory system into a project:

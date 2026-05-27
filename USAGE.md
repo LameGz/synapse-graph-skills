@@ -1,5 +1,20 @@
 # Synapse — Usage Guide
 
+## v1.5 Daily Flow
+
+```bash
+bash scripts/init.sh --fullstack
+python scripts/project_resume.py --project .
+python scripts/memory_inbox.py list --project .
+python scripts/memory_inbox.py apply --project .
+bash scripts/generate_memory_map.sh --db
+```
+
+- Start a returning session with Project Resume.
+- Let session-end auto-observe high-confidence source changes.
+- Review `.synapse/inbox.json` for low-confidence proposals before applying.
+- Keep `meta/*.md` as the source of truth; treat `MEMORY_MAP.*` and SQLite as derived outputs.
+
 ## Installation
 
 ### From this repository

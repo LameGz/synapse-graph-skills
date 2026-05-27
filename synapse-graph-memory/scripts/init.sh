@@ -25,14 +25,21 @@ META_DIR="${PROJECT_ROOT}/meta"
 MAP_SCRIPT="${SCRIPT_DIR}/generate_memory_map.sh"
 
 FULLSTACK=false
+PROJECT_ROOT_OVERRIDE=""
 
 # Argument parsing
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --fullstack) FULLSTACK=true; shift ;;
+    --project) PROJECT_ROOT_OVERRIDE="$2"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+if [ -n "$PROJECT_ROOT_OVERRIDE" ]; then
+  PROJECT_ROOT="$(cd "$PROJECT_ROOT_OVERRIDE" && pwd)"
+  META_DIR="${PROJECT_ROOT}/meta"
+fi
 
 echo "🧠 Synapse Cold-Start Wizard"
 echo "   Project: $PROJECT_ROOT"
@@ -51,7 +58,7 @@ if [ ! -f "$MAP_SCRIPT" ] && [ -f "${SKILL_SCRIPTS}/generate_memory_map.sh" ]; t
 fi
 
 # Copy auxiliary scripts (suggest_edges, etc.)
-for aux in suggest_edges.sh ingest_memory.py apply_memory_proposal.py doctor.sh; do
+for aux in suggest_edges.sh ingest_memory.py apply_memory_proposal.py doctor.sh memory_inbox.py project_resume.py; do
   src="${SKILL_SCRIPTS}/${aux}"
   dst="${PROJECT_ROOT}/scripts/${aux}"
   if [ ! -f "$dst" ] && [ -f "$src" ]; then
@@ -503,16 +510,16 @@ else:
   echo "Next: review skeletons, run suggest_edges.sh, use daily-note to fill details"
 fi
 
-# ─── Step 4: Generate mod_project.md ───────────────────────────────────
+# ─── Step 4: Generate proj_project.md ──────────────────────────────────
 echo "📝 Generating nodes..."
 
 TODAY=$(date +%Y-%m-%d)
 
-if [ ! -f "${META_DIR}/mod_project.md" ]; then
-  cat > "${META_DIR}/mod_project.md" << EOF
+if [ ! -f "${META_DIR}/proj_project.md" ]; then
+  cat > "${META_DIR}/proj_project.md" << EOF
 ---
-id: mod_project
-type: module
+id: proj_project
+type: project
 status: in-progress
 updated: ${TODAY}
 summary: "Project overview and architecture decisions. Entry point for new sessions."
@@ -542,9 +549,9 @@ None yet — add as modules are created.
   **Impact**: All future sessions use graph-based partitioned loading
   **Affected**: none
 EOF
-  echo "   ✓ ${META_DIR}/mod_project.md"
+  echo "   ✓ ${META_DIR}/proj_project.md"
 else
-  echo "   ⊘ ${META_DIR}/mod_project.md already exists, skipping"
+  echo "   ⊘ ${META_DIR}/proj_project.md already exists, skipping"
 fi
 
 # ─── Step 5: Generate module skeletons ─────────────────────────────────
@@ -579,7 +586,7 @@ status: in-progress
 updated: ${TODAY}
 summary: "$(echo "$mod" | sed 's/-/ /g' | awk '{print toupper(substr($0,1,1)) substr($0,2)}'). Auto-generated skeleton — review and fill in."
 depends_on:
-  - meta/mod_project.md
+  - meta/proj_project.md
 tags: ${tags}
 ---
 
@@ -602,7 +609,7 @@ None yet — add as connections are discovered.
 - [${TODAY}] **Context**: Synapse initialization
   **Change**: Module skeleton auto-generated from directory structure
   **Impact**: Provides initial node for memory graph
-  **Affected**: mod_project
+  **Affected**: proj_project
 EOF
   echo "   ✓ ${mod_file}"
 done
