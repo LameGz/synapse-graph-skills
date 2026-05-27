@@ -69,12 +69,19 @@ fi
 META_DIR="${PROJECT_ROOT}/meta"
 
 PY_ENGINE="${SCRIPT_DIR}/suggest_edges.py"
-PY_BIN=""
-if command -v python3 >/dev/null 2>&1; then
-  PY_BIN="python3"
-elif command -v python >/dev/null 2>&1; then
-  PY_BIN="python"
-fi
+pick_python() {
+  local candidate
+  for candidate in "${PYTHON_BIN:-}" python3 python; do
+    [ -n "$candidate" ] || continue
+    command -v "$candidate" >/dev/null 2>&1 || continue
+    "$candidate" -c "import json" >/dev/null 2>&1 || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+PY_BIN="$(pick_python || true)"
 
 if [ -z "${SYNAPSE_LEGACY_SUGGEST:-}" ] \
   && [ "$MODE" = "suggest" ] \
