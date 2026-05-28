@@ -250,6 +250,10 @@ synapse-graph-skills/
 
 详见 [docs/contributing.md](docs/contributing.md)，包含 skill 结构规范、eval 格式、PR checklist。
 
+## 🙏 致谢
+
+感谢 [Linux.do 社区](https://linux.do/) 的讨论、反馈与支持。
+
 ## 许可证
 
 MIT——详见 [LICENSE](LICENSE)。

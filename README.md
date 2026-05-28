@@ -270,6 +270,10 @@ Zero pip packages. Zero npm packages. No vector database. No embeddings. No exte
 
 See [docs/contributing.md](docs/contributing.md) for skill structure conventions, eval format, and PR checklist.
 
+## 🙏 Acknowledgements
+
+Thanks to the [Linux.do community](https://linux.do/) for the discussion, feedback, and support.
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
