@@ -47,6 +47,9 @@ synapse-graph-memory/examples/**/.synapse-proposal.json
 # Node
 node_modules/
 
+# Runtime artifacts
+.benchmark/
+
 # Local build/test residue
 .tmp-*/
 %TEMP%*/

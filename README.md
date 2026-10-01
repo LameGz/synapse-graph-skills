@@ -206,6 +206,8 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 
 ## Eval & Benchmarks
 
+> **Data provenance**: the v1.0 table below comes from 2 recorded eval runs (see `EVAL_REPORT.md` and `synapse-graph-memory-workspace/`). The v1.2 and v1.4 tables are **theoretical estimates / simulated data, not measured benchmarks**. Reproducible offline test commands live in `tests/` (e.g. `bash tests/test_legacy_capabilities.sh`).
+
 ### v1.0 Baseline (8-node SaaS fixture, deepseek-v4-pro)
 
 | Metric | With Skill | Without Skill | Delta |
@@ -214,7 +216,7 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 | Irrelevant Files | **0** | 4.5 | key win |
 | Assertion Pass Rate | **100%** | 62.5% | — |
 
-### v1.2 SQLite Performance (30-node fixture, measured 2026-05-24)
+### v1.2 SQLite Performance (theoretical estimates, not measured runs)
 
 | Operation | v1.0 (bash+grep) | v1.2 (SQLite FTS5) | Speedup |
 |-----------|-----------------|-------------------|---------|
@@ -224,7 +226,7 @@ Synapse loads exactly the right nodes — MAP first, then target, then BFS depen
 | Doctor health check | ~350ms (bash loop) | ~120ms (SQL JOIN) | **~3×** |
 | MAP full rebuild + SQLite sync | ~2.1s (JSON only) | ~1.6s (JSON + SQLite) | **~1.3×** |
 
-### v1.4 Auto-Observe Accuracy (simulated 50-session run)
+### v1.4 Auto-Observe Accuracy (simulated 50-session run, not measured)
 
 | Signal Type | Precision | Recall | Notes |
 |-------------|-----------|--------|-------|
@@ -243,13 +245,16 @@ Full report: [EVAL_REPORT.md](EVAL_REPORT.md)
 
 ```
 synapse-graph-skills/
-├── synapse-graph-memory/     # Core engine — retrieval, BFS, SQLite, auto-write
+├── synapse-graph-memory/     # Core engine (canonical) — retrieval, BFS, SQLite, prefetch, auto-write
 │   ├── SKILL.md              # Retrieval protocol + autonomous writing rules
 │   ├── references/           # Node specs, patch rules, full-stack node types
-│   └── scripts/              # 17 scripts: MAP, doctor, watch, auto_observe, etc.
-├── synapse-timeline/         # Read-only timeline & issues queries
-├── synapse-daily-note/       # NL → memory write pipeline
-├── synapse-init/             # Cold-start wizard (thin wrapper)
+│   └── scripts/              # 26 scripts: MAP, doctor, watch, auto_observe, prefetch, etc.
+├── synapse-timeline/         # Read-only timeline & issues queries (scripts synced by build_dist)
+├── synapse-daily-note/       # NL → memory write pipeline (scripts synced by build_dist)
+├── synapse-init/             # Cold-start wizard (thin wrapper; scripts synced by build_dist)
+├── adapters/                 # Pluggable host adapters: Claude Code / Codex / Gemini CLI / Pi / generic
+├── scripts/                  # build_dist.py single-source build + dist-manifest.json
+├── tests/                    # Offline test suite
 ├── docs/                     # Architecture, contributing, skills overview, specs, plans
 ├── EVOLUTION.md              # Full version evolution log (internal generations + v1.0-v1.5)
 ├── EVAL_REPORT.md            # Benchmark results

@@ -189,6 +189,8 @@ Synapse 精确加载需要的节点——MAP 先查，再目标节点，BFS 展�
 
 ## 基准数据
 
+> **数据性质说明**:以下 v1.0 表来自 2 条实跑 eval 记录(见 `EVAL_REPORT.md` 与 `synapse-graph-memory-workspace/`);v1.2 与 v1.4 两张表为**理论测算/模拟数据,非实测基准**。可复现的离线测试命令见 `tests/`(`bash tests/test_legacy_capabilities.sh` 等)。
+
 ### v1.0 基线（8 节点测试项目，deepseek-v4-pro）
 
 | 指标 | 装 Skill | 不装 | 变化 |
@@ -197,7 +199,7 @@ Synapse 精确加载需要的节点——MAP 先查，再目标节点，BFS 展�
 | 无关文件 | **0** | 4.5 | 核心优势 |
 | 断言通过率 | **100%** | 62.5% | — |
 
-### v1.2 SQLite 性能（30 节点测试）
+### v1.2 SQLite 性能（理论测算，未实测运行）
 
 | 操作 | v1.0 (bash+grep) | v1.2 (SQLite FTS5) | 加速 |
 |------|-----------------|-------------------|------|
@@ -206,7 +208,7 @@ Synapse 精确加载需要的节点——MAP 先查，再目标节点，BFS 展�
 | Doctor 健康检查 | ~350ms | ~120ms | **~3×** |
 | 全量 MAP 重建 | ~2.1s | ~1.6s | **~1.3×** |
 
-### v1.4 自动观察准确率（模拟 50 会话）
+### v1.4 自动观察准确率（模拟 50 会话，非实测）
 
 | 信号类型 | 精确率 | 召回率 | 说明 |
 |----------|--------|--------|------|
@@ -223,13 +225,16 @@ Synapse 精确加载需要的节点——MAP 先查，再目标节点，BFS 展�
 
 ```
 synapse-graph-skills/
-├── synapse-graph-memory/     # 核心引擎——检索、BFS、SQLite、自动写入
+├── synapse-graph-memory/     # 核心引擎（canonical）——检索、BFS、SQLite、预取、自动写入
 │   ├── SKILL.md              # 检索协议 + 自主写入规则
 │   ├── references/           # 节点规范、补丁规则、全栈节点类型
-│   └── scripts/              # 17 个脚本：MAP、doctor、watch、auto_observe 等
-├── synapse-timeline/         # 只读时间线 & 问题查询
-├── synapse-daily-note/       # NL → 记忆写入管线
-├── synapse-init/             # 冷启动向导（薄 wrapper）
+│   └── scripts/              # 26 个脚本：MAP、doctor、watch、auto_observe、prefetch 等
+├── synapse-timeline/         # 只读时间线 & 问题查询（脚本由 build_dist 同步）
+├── synapse-daily-note/       # NL → 记忆写入管线（脚本由 build_dist 同步）
+├── synapse-init/             # 冷启动向导（薄 wrapper，脚本由 build_dist 同步）
+├── adapters/                 # 可插拔宿主适配器：Claude Code / Codex / Gemini CLI / Pi / 通用
+├── scripts/                  # build_dist.py 单一来源构建 + dist-manifest.json
+├── tests/                    # 离线测试套件
 ├── docs/                     # 架构、贡献指南、设计文档、实现计划
 ├── EVOLUTION.md              # 完整版本演化日志（内部代号 + v1.0-v1.5）
 ├── EVAL_REPORT.md            # 基准测试结果
