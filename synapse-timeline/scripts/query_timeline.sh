@@ -71,6 +71,77 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# ─── SQLite priority path (if DB exists) ───────────────────────────────
+DB_PATH="${PROJECT}/.synapse/cache/memory.db"
+USE_SQLITE=false
+if [ -f "$DB_PATH" ] && command -v python3 >/dev/null 2>&1; then
+  USE_SQLITE=true
+fi
+
+if [ "$USE_SQLITE" = true ] && [ "$ISSUES" -eq 0 ]; then
+  python3 -c "
+import json, sqlite3, sys
+
+conn = sqlite3.connect('${DB_PATH}')
+
+where_clauses = []
+params = []
+
+if '${NODE}':
+    node_id = '${NODE}'.replace('meta/', '').replace('.md', '')
+    where_clauses.append('n.id = ?')
+    params.append(node_id)
+
+if '${TAG}':
+    where_clauses.append('(n.tags LIKE ? OR n.aliases LIKE ?)')
+    params.extend([f'%{('${TAG}')}%', f'%{('${TAG}')}%'])
+
+if '${SINCE}':
+    where_clauses.append('n.updated >= ?')
+    params.append('${SINCE}')
+
+where_sql = ' AND '.join(where_clauses) if where_clauses else '1=1'
+limit = int('${LIMIT}') if '${LIMIT}'.isdigit() else 20
+
+query = f'''
+    SELECT n.id, n.type, n.status, n.summary, n.tags, n.aliases, n.updated, n.file_path
+    FROM nodes n
+    WHERE {where_sql}
+    ORDER BY n.updated DESC
+    LIMIT {limit}
+'''
+
+try:
+    results = conn.execute(query, params).fetchall()
+except Exception as e:
+    print(f'SQLite error: {e}', file=sys.stderr)
+    sys.exit(1)
+
+if not results:
+    print('No matching nodes found.')
+    sys.exit(0)
+
+if '${SUMMARY}' == '1':
+    print(f'Nodes: {len(results)}')
+    tags_all = set()
+    for r in results:
+        for t in json.loads(r[4] or '[]'):
+            tags_all.add(t)
+    print(f'Tags: {\", \".join(sorted(tags_all))}')
+    print()
+
+for r in results:
+    tags_str = ', '.join(json.loads(r[4] or '[]')[:3])
+    print(f'[{r[0]}] {r[3][:100]}')
+    print(f'  Status: {r[2]} | Updated: {r[6]} | Tags: {tags_str}')
+
+conn.close()
+" 2>&1
+  exit $?
+fi
+
+# Fall through to existing bash query logic...
+
 PROJECT_ABS="$(cd "$PROJECT" && pwd)"
 
 python - "$PROJECT_ABS" "$NODE" "$TAG" "$SINCE" "$RECENT" "$LIMIT" "$SUMMARY" "$ISSUES" <<'PY'

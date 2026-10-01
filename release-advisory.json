@@ -1,60 +1,73 @@
 {
   "name": "synapse-graph-skills",
-  "version": "1.0.0",
-  "release_date": "2026-05-21",
+  "version": "1.5.0",
+  "release_date": "2026-10-01",
   "status": "stable",
-  "description": "Engineering memory system for solo full-stack developers — partitioned context loading via graph topology.",
+  "description": "File-based engineering memory for solo full-stack developers — graph-topology context loading with seamless auto-record (session end) and auto-prefetch (user prompt submit). Zero pip/npm dependencies.",
   "skills": {
     "synapse-graph-memory": {
-      "version": "1.0.0",
-      "path": "skills/synapse-graph-memory/",
+      "version": "1.5.0",
+      "path": "synapse-graph-memory/",
       "package": "synapse-graph-memory.skill",
-      "size_kb": 66,
-      "description": "Core retrieval protocol — 7-step decision tree with three-layer progressive disclosure. Handles status queries, cross-module impact analysis, and bounded BFS traversal.",
+      "role": "canonical",
+      "description": "Core memory engine — retrieval protocol, bounded BFS link tracing, SQLite FTS5 cache, prefetch_context (read side), auto_observe + session-end hook (write side), Memory Inbox, Project Resume.",
       "triggers": ["XX 做得怎么样了", "会影响哪些功能", "加载记忆节点", "上次做到哪了"],
-      "scripts": ["init.sh", "synapse_note.sh", "query_timeline.sh", "generate_memory_map.sh", "suggest_edges.sh", "doctor.sh", "ingest_memory.py", "apply_memory_proposal.py"],
-      "hooks": ["pre-read-check", "pre-modify-check", "post-tool-use", "session-end"]
+      "hooks": ["pre-read-check", "pre-modify-check", "post-tool-use", "session-end"],
+      "new_in_1.5": [
+        "prefetch_context.py (UserPromptSubmit memory prefetch)",
+        "hardened session-end.sh (interpreter discovery, empty-array guards, SessionEnd event)"
+      ]
     },
     "synapse-timeline": {
-      "version": "1.0.0",
-      "path": "skills/synapse-timeline/",
+      "version": "1.5.0",
+      "path": "synapse-timeline/",
       "package": "synapse-timeline.skill",
-      "size_kb": 5.5,
-      "description": "Read-only timeline and open issues query. Parses Change Log and Open Issues from memory nodes with rich filtering by tag, date, and node.",
-      "triggers": ["最近改了啥", "有哪些 open issues", "进度怎么样了", "XX 模块最近的变化"],
-      "scripts": ["query_timeline.sh"]
+      "role": "synced-from-canonical",
+      "description": "Read-only timeline and open issues query. Parses Change Log and Open Issues from memory nodes with filtering by tag, date, and node.",
+      "triggers": ["最近改了啥", "有哪些 open issues", "进度怎么样了", "XX 模块最近的变化"]
     },
     "synapse-daily-note": {
-      "version": "1.0.0",
-      "path": "skills/synapse-daily-note/",
+      "version": "1.5.0",
+      "path": "synapse-daily-note/",
       "package": "synapse-daily-note.skill",
-      "size_kb": 26,
-      "description": "One-command NL-to-memory pipeline. Five stages: ingest (NL→JSON), suggest edges, interactive confirm, apply to meta/*.md, rebuild MAP, doctor validation.",
-      "triggers": ["记录一下", "记一条记忆", "今天做了什么", "log this change"],
-      "scripts": ["synapse_note.sh", "ingest_memory.py", "suggest_edges.sh", "apply_memory_proposal.py", "generate_memory_map.sh", "doctor.sh"]
+      "role": "synced-from-canonical",
+      "description": "NL-to-memory write pipeline — ingest, edge suggestions, apply, MAP rebuild, doctor validation.",
+      "triggers": ["记录一下", "记一条记忆", "今天做了什么", "log this change"]
     },
     "synapse-init": {
-      "version": "1.0.0",
-      "path": "skills/synapse-init/",
+      "version": "1.5.0",
+      "path": "synapse-init/",
       "package": "synapse-init.skill",
-      "size_kb": 43,
-      "description": "Cold-start wizard. Auto-detects tech stack, infers module boundaries from src/ structure, generates skeleton nodes, copies helper scripts, and registers Claude Code hooks.",
-      "triggers": ["初始化记忆", "给项目配 Synapse", "setup memory", "bootstrap memory graph"],
-      "scripts": ["init.sh", "generate_memory_map.sh", "suggest_edges.sh", "ingest_memory.py", "apply_memory_proposal.py", "doctor.sh"],
-      "hooks": ["pre-read-check", "pre-modify-check", "post-tool-use", "session-end"]
+      "role": "synced-from-canonical (init.sh remains a delegating wrapper)",
+      "description": "Cold-start wizard. Auto-detects tech stack, infers module boundaries, generates skeleton nodes, copies helper scripts, and registers host hooks.",
+      "triggers": ["初始化记忆", "给项目配 Synapse", "setup memory", "bootstrap memory graph"]
     }
+  },
+  "host_adapters": {
+    "installer": "adapters/install_adapter.py",
+    "contract": "Adapters normalize host lifecycle events only; memory policy lives in the shared scripts.",
+    "hosts": {
+      "claude-code": "hooks in .claude/settings.json (SessionEnd / UserPromptSubmit / PreToolUse / PostToolUse)",
+      "agents-md": "managed instruction section for AGENTS.md-spec hosts: codex, gemini-cli, pi, zed, opencode, cursor",
+      "generic": "standalone instructions at .synapse/agent-instructions.md"
+    }
+  },
+  "build": {
+    "single_source": "synapse-graph-memory/scripts/ is canonical; dependent skills receive synced copies via scripts/build_dist.py (see scripts/dist-manifest.json). CI enforces with `build_dist.py --check`."
   },
   "compatibility": {
     "bash": "4.0+",
     "python": "3.8+",
-    "python_deps": "stdlib only (json, re, sys, datetime, pathlib)",
-    "os": ["linux", "macos", "windows-wsl"],
-    "claude_code": "any"
+    "python_deps": "stdlib only (json, re, sys, datetime, pathlib, sqlite3, ast)",
+    "os": ["linux", "macos", "windows (git bash / msys)"],
+    "claude_code": "any",
+    "other_hosts": "codex cli, gemini cli, pi, zed, opencode, cursor, generic (via adapters)"
   },
   "eval_results": {
     "model": "deepseek-v4-pro",
     "fixture": "solo-saas (8 nodes)",
     "evals_run": 2,
+    "provenance_note": "Only the v1.0 table is backed by recorded eval runs. The v1.2 performance and v1.4 accuracy figures elsewhere in the README are theoretical estimates / simulated data.",
     "mean_files_read": {
       "with_skill": 8.0,
       "without_skill": 13.0,
@@ -77,8 +90,6 @@
   ],
   "next": [
     "Complete 8-eval suite for synapse-graph-memory",
-    "Run evals for synapse-timeline, synapse-daily-note, synapse-init",
-    "Test with Claude Opus and Claude Sonnet models",
-    "Consider merging 4 skills into one /synapse parent skill with internal routing"
+    "v2 dual-host proposal protocol (docs/superpowers/specs/2026-07-10-synapse-v2-dual-host-foundation-design.md)"
   ]
 }

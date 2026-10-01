@@ -1,0 +1,19 @@
+{
+  "source_skill": "synapse-graph-memory",
+  "comment": "Single-source distribution: all scripts under the source skill's scripts/ dir are canonical. Dependent skills receive synced copies at build time. Never hand-edit synced copies.",
+  "targets": {
+    "synapse-daily-note": {
+      "include": "*",
+      "keep": []
+    },
+    "synapse-init": {
+      "include": "*",
+      "keep": ["init.sh"]
+    },
+    "synapse-timeline": {
+      "include": ["query_timeline.sh"],
+      "keep": []
+    }
+  },
+  "package_exclude": ["__pycache__", "*.pyc", ".benchmark", ".DS_Store", "examples/solo-saas/.claude"]
+}

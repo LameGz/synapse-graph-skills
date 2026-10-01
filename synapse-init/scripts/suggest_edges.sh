@@ -231,7 +231,9 @@ auto_suggest() {
     fi
   done < "$CO_DB"
 
-  if [ ${#CO_COUNT[@]} -eq 0 ]; then
+  # Guard for empty arrays under `set -u` (bash 3.2 / 5.3-cygwin abort on
+  # bare "${#CO_COUNT[@]}" when nothing was loaded).
+  if [ "${CO_COUNT[@]+y}" != "y" ]; then
     echo "No co-occurrence pairs after decay."
     exit 0
   fi

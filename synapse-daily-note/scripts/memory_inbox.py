@@ -43,7 +43,11 @@ def load_inbox(project: Path) -> dict:
         return {"version": INBOX_VERSION, "items": []}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        # Never silently reset a corrupt inbox: preserve the bytes for diagnosis.
+        backup = path.with_name(f"inbox.json.corrupt-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}")
+        path.replace(backup)
+        print(f"WARNING: corrupt inbox.json backed up to {backup.name}", flush=True)
         return {"version": INBOX_VERSION, "items": []}
     data.setdefault("version", INBOX_VERSION)
     data.setdefault("items", [])
@@ -133,12 +137,19 @@ def insert_bullet(text: str, heading: str, bullet: str) -> str:
 
 
 def target_path(project: Path, target_node: str) -> Path:
+    root = project.resolve()
     name = target_node
     if name.startswith("meta/"):
-        return project / name
-    if name.endswith(".md"):
-        return project / "meta" / Path(name).name
-    return project / "meta" / f"{name}.md"
+        candidate = root / name
+    elif name.endswith(".md"):
+        candidate = root / "meta" / Path(name).name
+    else:
+        candidate = root / "meta" / f"{name}.md"
+    resolved = candidate.resolve()
+    meta_root = (root / "meta").resolve()
+    if resolved != meta_root and meta_root not in resolved.parents:
+        raise SystemExit(f"Refusing target outside meta/: {target_node}")
+    return resolved
 
 
 def apply_to_node(project: Path, item: dict) -> bool:
@@ -161,13 +172,18 @@ def apply_to_node(project: Path, item: dict) -> bool:
     return True
 
 
-def apply_items(project: Path | str, limit: int | None = None) -> int:
+def apply_items(project: Path | str, limit: int | None = None, item_id: str | None = None) -> int:
     project = Path(project)
     data = load_inbox(project)
     remaining = []
     applied = 0
     for item in data["items"]:
-        if limit is not None and applied >= limit:
+        if item_id is not None:
+            # Apply only the requested item; keep everything else untouched.
+            if item.get("id") != item_id:
+                remaining.append(item)
+                continue
+        elif limit is not None and applied >= limit:
             remaining.append(item)
             continue
         if apply_to_node(project, item):
@@ -207,6 +223,7 @@ def main() -> int:
         p.add_argument("--project", default=".")
     sub.choices["add"].add_argument("--proposal", required=True)
     sub.choices["apply"].add_argument("--limit", type=int)
+    sub.choices["apply"].add_argument("--id", help="Apply a single queued item by id")
     args = parser.parse_args()
 
     project = Path(args.project).resolve()
@@ -224,7 +241,7 @@ def main() -> int:
         for item in data["items"][:20]:
             print(f"- {item['id']} [{item.get('change_type')}] {item.get('target_node')}: {item.get('content')}")
     elif args.command == "apply":
-        print(f"Inbox applied: {apply_items(project, args.limit)}")
+        print(f"Inbox applied: {apply_items(project, args.limit, args.id)}")
     elif args.command == "clear":
         save_inbox(project, {"version": INBOX_VERSION, "items": []})
         print("Inbox cleared.")

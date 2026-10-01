@@ -89,7 +89,7 @@ def init_db(db_path, force=False):
             print("Use --force to overwrite")
             return False
 
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
 
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")

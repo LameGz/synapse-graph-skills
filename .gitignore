@@ -30,9 +30,9 @@ Desktop.ini
 # Shell
 *.log
 
-# Skill packaging artifacts
+# Skill packaging artifacts (root packages are committed release artifacts)
 *.skill
-!skills/*.skill
+!*.skill
 
 # Test artifacts
 *-workspace/
@@ -46,3 +46,7 @@ synapse-graph-memory/examples/**/.synapse-proposal.json
 
 # Node
 node_modules/
+
+# Local build/test residue
+.tmp-*/
+%TEMP%*/

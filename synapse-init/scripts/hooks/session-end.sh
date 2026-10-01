@@ -1,17 +1,47 @@
 #!/usr/bin/env bash
 # SessionEnd hook: rebuilds MEMORY_MAP, validates topology, outputs change summary.
 # Runs automatically at session end — Agent does NOT need to remember.
+# Registered under the SessionEnd event by default; also safe under Stop.
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$PWD}"
 META_DIR="${PROJECT_ROOT}/meta"
+
+# Interpreter discovery: PYTHON_BIN wins, then python3, then python.
+# (Git Bash on Windows usually only ships `python`; macOS/Linux may ship only `python3`.)
+pick_python() {
+    local candidate
+    for candidate in "${PYTHON_BIN:-}" python3 python; do
+        [ -n "$candidate" ] || continue
+        command -v "$candidate" >/dev/null 2>&1 || continue
+        "$candidate" -c "import json" >/dev/null 2>&1 || continue
+        printf '%s\n' "$candidate"
+        return 0
+    done
+    return 1
+}
+PY_BIN="$(pick_python || true)"
+
+# Native Windows Python cannot open MSYS-style paths; translate via cygpath when present.
+python_path() {
+    local path="$1"
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$path" 2>/dev/null || printf '%s\n' "$path"
+    else
+        printf '%s\n' "$path"
+    fi
+}
 
 # ─── Step 1: Rebuild index + validate topology ────────────────────────
 echo "---"
 echo "🔍 Synapse Session End — Running memory integrity checks..."
 
 MAP_SCRIPT="${PROJECT_ROOT}/scripts/generate_memory_map.sh"
+[ -f "$MAP_SCRIPT" ] || MAP_SCRIPT="${SCRIPT_DIR}/../generate_memory_map.sh"
 WEEKLY_FLAG="${PROJECT_ROOT}/.claude/.synapse_cache/.weekly_full_check"
+CACHE_DIR="$(dirname "$WEEKLY_FLAG")"
 FULL_CHECK_INTERVAL_DAYS=7
 
 need_full=false
@@ -31,6 +61,7 @@ if [ -f "$MAP_SCRIPT" ]; then
   if $need_full; then
     echo "Running full MAP rebuild (weekly health check)..."
     bash "$MAP_SCRIPT" --full 2>&1
+    mkdir -p "$CACHE_DIR"
     date +%s > "$WEEKLY_FLAG"
   else
     # Incremental: only re-index meta/ files changed in this session
@@ -215,7 +246,9 @@ if [ -d "$META_DIR" ]; then
   } | sort > "$CO_DB"
 
   # ─── Compute confidence & generate suggestions ───────────────────────
-  if [ ${#CO_COUNT[@]} -gt 0 ]; then
+  # "${CO_COUNT[@]+y}" expands safely under `set -u` even when the array is
+  # empty (bare "${#CO_COUNT[@]}" aborts on bash 3.2 / 5.3-cygwin).
+  if [ "${CO_COUNT[@]+y}" ]; then
     auto_links=""
     suggestions=""
 
@@ -412,97 +445,107 @@ fi
 
 # ─── Step 5: Auto-observe & auto-record (V3.4) ──────────────────────
 AUTO_OBSERVE_SCRIPT="${PROJECT_ROOT}/scripts/auto_observe.py"
+[ -f "$AUTO_OBSERVE_SCRIPT" ] || AUTO_OBSERVE_SCRIPT="${SCRIPT_DIR}/../auto_observe.py"
 MEMORY_INBOX_SCRIPT="${PROJECT_ROOT}/scripts/memory_inbox.py"
+[ -f "$MEMORY_INBOX_SCRIPT" ] || MEMORY_INBOX_SCRIPT="${SCRIPT_DIR}/../memory_inbox.py"
+NOTE_SCRIPT="${PROJECT_ROOT}/scripts/synapse_note.sh"
+[ -f "$NOTE_SCRIPT" ] || NOTE_SCRIPT="${SCRIPT_DIR}/../synapse_note.sh"
 AUTO_PROPOSAL_DIR="${PROJECT_ROOT}/.claude/.synapse_cache/auto-proposals"
 AUTO_CONFIRM_THRESHOLD=70
 
-if [ -f "$AUTO_OBSERVE_SCRIPT" ] && command -v python3 >/dev/null 2>&1; then
+if [ -f "$AUTO_OBSERVE_SCRIPT" ] && [ -n "$PY_BIN" ]; then
   mkdir -p "$AUTO_PROPOSAL_DIR"
 
   today=$(date +%Y-%m-%d)
   proposal_file="${AUTO_PROPOSAL_DIR}/${today}_proposals.json"
 
-  python3 "$AUTO_OBSERVE_SCRIPT" --project "$PROJECT_ROOT" \
+  "$PY_BIN" "$AUTO_OBSERVE_SCRIPT" --project "$PROJECT_ROOT" \
     --min-confidence 40 --output "$proposal_file" 2>&1
 
   if [ -f "$proposal_file" ]; then
-    python3 -c "
-import json, sys, os
+    SYNAPSE_PROPOSAL_FILE="$(python_path "$proposal_file")" \
+    SYNAPSE_AUTO_APPLY="${AUTO_PROPOSAL_DIR}/auto_apply.json" \
+    SYNAPSE_NEEDS_REVIEW="${AUTO_PROPOSAL_DIR}/needs_review.json" \
+    SYNAPSE_THRESHOLD="$AUTO_CONFIRM_THRESHOLD" \
+    "$PY_BIN" -c "
+import json, os
 
-with open('${proposal_file}') as f:
+with open(os.environ['SYNAPSE_PROPOSAL_FILE'], encoding='utf-8') as f:
     data = json.load(f)
 
-high = [p for p in data.get('proposals', []) if p['confidence'] >= ${AUTO_CONFIRM_THRESHOLD}]
-low = [p for p in data.get('proposals', []) if p['confidence'] < ${AUTO_CONFIRM_THRESHOLD}]
+proposals = data.get('proposals', [])
+high = [p for p in proposals if p.get('confidence', 0) >= int(os.environ['SYNAPSE_THRESHOLD'])]
+low = [p for p in proposals if p.get('confidence', 0) < int(os.environ['SYNAPSE_THRESHOLD'])]
 
 if high:
-    with open('${AUTO_PROPOSAL_DIR}/auto_apply.json', 'w') as f:
+    with open(os.environ['SYNAPSE_AUTO_APPLY'], 'w', encoding='utf-8') as f:
         json.dump({'proposals': high}, f, indent=2, ensure_ascii=False)
 
 if low:
-    with open('${AUTO_PROPOSAL_DIR}/needs_review.json', 'w') as f:
+    with open(os.environ['SYNAPSE_NEEDS_REVIEW'], 'w', encoding='utf-8') as f:
         json.dump({'proposals': low}, f, indent=2, ensure_ascii=False)
 
-print(f'AUTO:{len(high)}/{len(data.get(\"proposals\", []))} proposals above threshold')
+print(f'AUTO:{len(high)}/{len(proposals)} proposals above threshold')
 " 2>&1
 
     if [ -f "${AUTO_PROPOSAL_DIR}/auto_apply.json" ]; then
-      auto_count=$(python3 -c "import json; print(len(json.load(open('${AUTO_PROPOSAL_DIR}/auto_apply.json'))['proposals']))" 2>/dev/null || echo 0)
+      auto_count=$(SYNAPSE_AUTO_APPLY="$(python_path "${AUTO_PROPOSAL_DIR}/auto_apply.json")" \
+        "$PY_BIN" -c "import json, os; print(len(json.load(open(os.environ['SYNAPSE_AUTO_APPLY'], encoding='utf-8'))['proposals']))" 2>/dev/null || echo 0)
 
       if [ "$auto_count" -gt 0 ]; then
         echo ""
         echo "📝 Auto-Recorded (V3.4):"
         echo "──────────────────────"
 
-        python3 -c "
+        SYNAPSE_PROJECT_ROOT="$PROJECT_ROOT" \
+        SYNAPSE_AUTO_APPLY="$(python_path "${AUTO_PROPOSAL_DIR}/auto_apply.json")" \
+        SYNAPSE_NOTE_SCRIPT="$(python_path "$NOTE_SCRIPT")" \
+        "$PY_BIN" -c "
 import json, os, subprocess
 
-proj = '${PROJECT_ROOT}'
-with open('${AUTO_PROPOSAL_DIR}/auto_apply.json') as f:
+proj = os.environ['SYNAPSE_PROJECT_ROOT']
+with open(os.environ['SYNAPSE_AUTO_APPLY'], encoding='utf-8') as f:
     data = json.load(f)
 
-note_script = os.path.join(proj, 'scripts/synapse_note.sh')
-if not os.path.exists(note_script):
-    note_script = os.path.join(os.path.dirname('${SCRIPT_DIR}'), 'synapse_note.sh')
+note_script = os.environ['SYNAPSE_NOTE_SCRIPT']
 
 applied = 0
 for p in data['proposals']:
     node = p.get('target_node', 'unknown')
     content = p.get('content', '')
-    change_type = p.get('change_type', 'change_log')
-    confidence = p.get('confidence', 0)
     if not content:
         continue
     text = content
-    if node and node != 'unknown' and node != '__all_db__' and node != 'all_db_':
+    if node and node not in ('unknown', '__all_db__', 'all_db_', 'all_db'):
         text = f'[{node}] {content}'
     try:
         result = subprocess.run(
             ['bash', note_script, '--project', proj, '--text', text,
              '--edge-mode', 'auto', '--auto-confirm'],
-            capture_output=True, text=True, timeout=15
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=15
         )
         if result.returncode == 0:
             applied += 1
             mark = chr(0x2713)
             print(f'  {mark} {node}: {content[:80]}')
         else:
-            print(f'  X {node}: failed ({result.stderr[:60]})')
+            print(f'  X {node}: failed ({(result.stderr or \"\")[:60]})')
     except Exception as e:
         print(f'  X {node}: error ({e})')
 
-print(f'')
+print('')
 print(f'  {applied}/{len(data[\"proposals\"])} proposals auto-applied')
 " 2>&1
       fi
     fi
 
     if [ -f "${AUTO_PROPOSAL_DIR}/needs_review.json" ]; then
-      low_count=$(python3 -c "import json; print(len(json.load(open('${AUTO_PROPOSAL_DIR}/needs_review.json'))['proposals']))" 2>/dev/null || echo 0)
+      low_count=$(SYNAPSE_NEEDS_REVIEW="$(python_path "${AUTO_PROPOSAL_DIR}/needs_review.json")" \
+        "$PY_BIN" -c "import json, os; print(len(json.load(open(os.environ['SYNAPSE_NEEDS_REVIEW'], encoding='utf-8'))['proposals']))" 2>/dev/null || echo 0)
 
       if [ "$low_count" -gt 0 ]; then
         if [ -f "$MEMORY_INBOX_SCRIPT" ]; then
-          inbox_result=$(python3 "$MEMORY_INBOX_SCRIPT" add --project "$PROJECT_ROOT" --proposal "${AUTO_PROPOSAL_DIR}/needs_review.json" 2>&1 || true)
+          inbox_result=$("$PY_BIN" "$MEMORY_INBOX_SCRIPT" add --project "$PROJECT_ROOT" --proposal "${AUTO_PROPOSAL_DIR}/needs_review.json" 2>&1 || true)
         else
           inbox_result="Memory inbox unavailable; review ${AUTO_PROPOSAL_DIR}/needs_review.json"
         fi
@@ -511,9 +554,10 @@ print(f'  {applied}/{len(data[\"proposals\"])} proposals auto-applied')
         echo "⚠  Needs Review (confidence < ${AUTO_CONFIRM_THRESHOLD}%):"
         echo "─────────────────────────────────────────"
 
-        python3 -c "
-import json
-with open('${AUTO_PROPOSAL_DIR}/needs_review.json') as f:
+        SYNAPSE_NEEDS_REVIEW="$(python_path "${AUTO_PROPOSAL_DIR}/needs_review.json")" \
+        "$PY_BIN" -c "
+import json, os
+with open(os.environ['SYNAPSE_NEEDS_REVIEW'], encoding='utf-8') as f:
     data = json.load(f)
 for i, p in enumerate(data['proposals'][:5]):
     print(f'  {i+1}. [{p.get(\"change_type\", \"?\")}] {p.get(\"content\", \"\")[:100]}')
@@ -522,7 +566,7 @@ for i, p in enumerate(data['proposals'][:5]):
         print(f'     evidence: {p[\"evidence\"]}')
 n = len(data['proposals'])
 if n > 5:
-    print(f'  ... and {n - 5} more. See {AUTO_PROPOSAL_DIR}/needs_review.json')
+    print(f'  ... and {n - 5} more. See {os.environ[\"SYNAPSE_NEEDS_REVIEW\"]}')
 " 2>&1
       fi
     fi
