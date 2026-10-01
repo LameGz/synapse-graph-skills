@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "comment": "Documentation mirror of adapters/hosts/*.py. The installer discovers host modules dynamically; this file is for humans and CI.",
+  "hosts": [
+    {
+      "name": "claude-code",
+      "aliases": ["claude"],
+      "integration": "hooks",
+      "config": ".claude/settings.json",
+      "lifecycle": ["SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse"]
+    },
+    {
+      "name": "agents-md",
+      "aliases": ["codex", "gemini-cli", "gemini", "pi", "zed", "opencode", "cursor"],
+      "integration": "managed instruction section in AGENTS.md (GEMINI.md for Gemini CLI)",
+      "config": "AGENTS.md",
+      "lifecycle": ["session-start (instruction)", "pre-answer prefetch (instruction)", "turn-end record (instruction)"]
+    },
+    {
+      "name": "generic",
+      "aliases": ["manual"],
+      "integration": "standalone instructions at .synapse/agent-instructions.md",
+      "config": "none",
+      "lifecycle": ["manual"]
+    }
+  ],
+  "contract": "A host module exposes NAME, ALIASES, detect(project)->bool and install(project, synapse_root)->list[str]. Adapters normalize lifecycle events only; memory policy lives in the shared scripts."
+}
