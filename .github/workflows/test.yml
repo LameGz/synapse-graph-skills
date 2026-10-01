@@ -2,16 +2,21 @@ name: Test Skills
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master, develop]
     paths:
-      - 'skills/**'
+      - 'synapse-*/**'
       - 'tests/**'
+      - 'scripts/**'
+      - 'adapters/**'
       - '.github/workflows/test.yml'
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
-      - 'skills/**'
+      - 'synapse-*/**'
       - 'tests/**'
+      - 'scripts/**'
+      - 'adapters/**'
+      - '.github/workflows/test.yml'
 
 jobs:
   validate-structure:
@@ -29,7 +34,7 @@ jobs:
 
       - name: Check required files exist
         run: |
-          SKILL_DIR="skills/${{ matrix.skill }}"
+          SKILL_DIR="${{ matrix.skill }}"
           for required in SKILL.md evals/evals.json; do
             if [ ! -f "$SKILL_DIR/$required" ]; then
               echo "ERROR: $SKILL_DIR/$required is missing"
@@ -40,7 +45,7 @@ jobs:
 
       - name: Validate SKILL.md frontmatter
         run: |
-          SKILL_DIR="skills/${{ matrix.skill }}"
+          SKILL_DIR="${{ matrix.skill }}"
           head -10 "$SKILL_DIR/SKILL.md" | grep -q "^---$" || {
             echo "ERROR: Missing YAML frontmatter"
             exit 1
@@ -55,6 +60,14 @@ jobs:
           }
           echo "Frontmatter valid"
 
+  dist-check:
+    name: Single-source distribution drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify synced skill scripts match the canonical core
+        run: python3 scripts/build_dist.py --check
+
   lint-scripts:
     name: Lint shell scripts
     runs-on: ubuntu-latest
@@ -64,35 +77,39 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
 
-      - name: Lint all .sh files
+      - name: Lint all .sh files (error severity blocks the build)
         run: |
-          echo "Checking shell scripts..."
-          find skills/ -name "*.sh" -print0 | while IFS= read -r -d '' f; do
-            echo "  shellcheck $f"
-            shellcheck -x -S warning "$f" || true
-          done
+          mapfile -t scripts < <(find synapse-*/scripts tests -name '*.sh' -print | sort)
+          echo "Checking ${#scripts[@]} scripts with shellcheck -S error"
+          shellcheck -S error "${scripts[@]}"
 
-  lint-markdown:
-    name: Lint markdown
-    runs-on: ubuntu-latest
+  test-offline:
+    name: Offline tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check markdown links
-        run: |
-          echo "Checking for broken internal links in SKILL.md files..."
-          for f in skills/*/SKILL.md; do
-            echo "  Checking $f"
-            # Extract references/ and scripts/ links and verify they exist
-            grep -oP 'references/[^)]+' "$f" | while read -r ref; do
-              target="$(dirname "$f")/$ref"
-              if [ ! -f "$target" ]; then
-                echo "  WARNING: referenced file not found: $ref"
-              fi
-            done || true
-          done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-  test-eval-fixtures:
+      - name: Run offline test suite
+        shell: bash
+        env:
+          PYTHON_BIN: python
+        run: |
+          bash tests/test_runner.sh --all
+          bash tests/test_generate_memory_map_py.sh
+          bash tests/test_suggest_edges_fast.sh
+          bash tests/test_suggest_edges_dedup.sh
+          python tests/test_memory_inbox.py
+          python tests/test_project_resume.py
+
+  validate-eval-fixtures:
     name: Validate eval fixtures
     runs-on: ubuntu-latest
     steps:
@@ -100,7 +117,7 @@ jobs:
 
       - name: Validate evals.json files
         run: |
-          for f in skills/*/evals/evals.json; do
+          for f in synapse-*/evals/evals.json; do
             echo "Validating $f"
             python3 -c "
 import json, sys
@@ -116,3 +133,29 @@ for i, ev in enumerate(data['evals']):
 print(f'  {len(data[\"evals\"])} eval cases — OK')
 "
           done
+
+  validate-adapters:
+    name: Validate host adapters
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Adapter list + install smoke test
+        shell: bash
+        run: |
+          python adapters/install_adapter.py list
+          T="$(mktemp -d)"
+          python adapters/install_adapter.py auto --project "$T" >/dev/null
+          python adapters/install_adapter.py claude-code --project "$T" >/dev/null
+          python -m json.tool "$T/.claude/settings.json" >/dev/null
+          python adapters/install_adapter.py codex --project "$T" >/dev/null
+          grep -q "synapse:begin" "$T/AGENTS.md"
+          rm -rf "$T"
+          echo "Adapters OK"

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g. v1.2.0)'
+        description: 'Version tag (e.g. v1.5.0)'
         required: true
         default: ''
 
@@ -30,8 +30,10 @@ jobs:
             echo "VERSION=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install dependencies
-        run: pip install pyyaml
+      - name: Sync single-source scripts
+        run: |
+          python3 scripts/build_dist.py
+          python3 scripts/build_dist.py --check
 
       - name: Package skills
         run: |
@@ -39,15 +41,13 @@ jobs:
           VERSION_CLEAN="${VERSION#v}"
           echo "Packaging skills for version $VERSION_CLEAN"
 
-          for skill_dir in skills/synapse-*/; do
+          for skill_dir in synapse-*/; do
             skill_name=$(basename "$skill_dir")
             echo "  Packaging $skill_name"
 
             # Create .skill archive (zip format)
-            cd "$skill_dir"
-            zip -r "../../${skill_name}-${VERSION_CLEAN}.skill" . \
-              -x "*.pyc" "*__pycache__*" ".DS_Store"
-            cd - > /dev/null
+            (cd "$skill_dir" && zip -r "../${skill_name}-${VERSION_CLEAN}.skill" . \
+              -x "*.pyc" "*__pycache__*" ".DS_Store" "*.benchmark*" "examples/solo-saas/.claude/*")
 
             echo "  Created ${skill_name}-${VERSION_CLEAN}.skill"
           done
@@ -60,18 +60,23 @@ jobs:
           python3 -c "
           import json
           advisory = {
+            'name': 'synapse-graph-skills',
             'version': '$VERSION',
             'release_date': '$(date +%Y-%m-%d)',
             'skills': {
-              'synapse-graph-memory': {'path': 'skills/synapse-graph-memory/', 'description': 'Core graph memory retrieval protocol — partitioned context loading with progressive disclosure'},
-              'synapse-timeline': {'path': 'skills/synapse-timeline/', 'description': 'Read-only timeline and progress queries — parse Change Log and Open Issues from memory nodes'},
-              'synapse-daily-note': {'path': 'skills/synapse-daily-note/', 'description': 'One-command NL-to-memory pipeline — ingest, suggest edges, apply, rebuild MAP, validate'},
-              'synapse-init': {'path': 'skills/synapse-init/', 'description': 'Cold-start wizard — detect stack, infer modules, generate skeleton nodes, register hooks'}
+              'synapse-graph-memory': {'path': 'synapse-graph-memory/', 'description': 'Core graph memory engine — retrieval protocol, bounded BFS, SQLite FTS5 cache, prefetch and auto-record'},
+              'synapse-timeline': {'path': 'synapse-timeline/', 'description': 'Read-only timeline and progress queries — parse Change Log and Open Issues from memory nodes'},
+              'synapse-daily-note': {'path': 'synapse-daily-note/', 'description': 'NL-to-memory pipeline — ingest, suggest edges, apply, rebuild MAP, validate'},
+              'synapse-init': {'path': 'synapse-init/', 'description': 'Cold-start wizard — detect stack, infer modules, generate skeleton nodes, register hooks'}
+            },
+            'host_adapters': {
+              'installer': 'adapters/install_adapter.py',
+              'hosts': ['claude-code', 'agents-md (codex/gemini-cli/pi/zed/opencode/cursor)', 'generic']
             },
             'compatibility': {
               'bash': '4+',
               'python': '3.8+',
-              'os': ['linux', 'macos', 'windows-wsl']
+              'os': ['linux', 'macos', 'windows (git bash / msys)']
             }
           }
           with open('release-advisory.json', 'w') as f:
