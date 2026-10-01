@@ -25,7 +25,7 @@ def get_git_diff(project_root):
             ['git', '-C', project_root, 'diff', 'HEAD', '--', 'src/', 'app/', 'lib/',
              'prisma/', 'migrations/', 'routes/', 'handlers/', 'controllers/',
              'components/', 'pages/', 'views/'],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
         )
         return result.stdout
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -37,8 +37,8 @@ def get_changed_files(project_root):
     try:
         result = subprocess.run(
             ['git', '-C', project_root, 'diff', '--name-only', 'HEAD', '--diff-filter=ACMR',
-             'src/', 'app/', 'lib/', 'prisma/'],
-            capture_output=True, text=True, timeout=5
+             '--', 'src/', 'app/', 'lib/', 'prisma/'],
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
         )
         return [f.strip() for f in result.stdout.split('\n') if f.strip()]
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -50,8 +50,8 @@ def get_new_files(project_root):
     try:
         result = subprocess.run(
             ['git', '-C', project_root, 'ls-files', '--others', '--exclude-standard',
-             'src/', 'app/', 'lib/', 'prisma/'],
-            capture_output=True, text=True, timeout=5
+             '--', 'src/', 'app/', 'lib/', 'prisma/'],
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=5
         )
         return [f.strip() for f in result.stdout.split('\n') if f.strip()]
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -261,12 +261,14 @@ def main():
     proposals = []
 
     diff_text = get_git_diff(args.project)
-    if diff_text:
-        changed = get_changed_files(args.project) + get_new_files(args.project)
-        if changed:
-            target_nodes, node_map = infer_target_nodes(changed)
-            diff_proposals = extract_diff_signals(diff_text, changed, node_map)
-            proposals.extend(diff_proposals)
+    changed = get_changed_files(args.project) + get_new_files(args.project)
+    # Emit file-change proposals even when `git diff` itself is empty —
+    # untracked new files (the most common brand-new work) produce no diff,
+    # but they still deserve to be recorded.
+    if changed:
+        target_nodes, node_map = infer_target_nodes(changed)
+        diff_proposals = extract_diff_signals(diff_text, changed, node_map)
+        proposals.extend(diff_proposals)
 
     if args.changed_file:
         target_nodes, node_map = infer_target_nodes([args.changed_file])

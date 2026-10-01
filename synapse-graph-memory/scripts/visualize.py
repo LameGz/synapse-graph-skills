@@ -18,7 +18,7 @@ def main():
         print(f"File not found: {map_path}", file=sys.stderr)
         sys.exit(1)
 
-    with open(map_path) as f:
+    with open(map_path, encoding="utf-8") as f:
         data = json.load(f)
 
     nodes = data.get("nodes", [])

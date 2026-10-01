@@ -232,8 +232,25 @@ def insert_edge_review_issues(lines, proposal):
     return lines
 
 
+def resolve_target_path(project, target_node):
+    """Resolve a proposal target inside <project>/meta/, refusing traversal outside it."""
+    root = Path(project).resolve()
+    name = str(target_node)
+    if name.startswith("meta/"):
+        candidate = root / name
+    elif name.endswith(".md"):
+        candidate = root / "meta" / Path(name).name
+    else:
+        candidate = root / "meta" / f"{name}.md"
+    resolved = candidate.resolve()
+    meta_root = (root / "meta").resolve()
+    if resolved != meta_root and meta_root not in resolved.parents:
+        raise SystemExit(f"Refusing target outside meta/: {target_node}")
+    return resolved
+
+
 def apply_proposal(project, proposal, edge_mode):
-    target = project / proposal["target_node"]
+    target = resolve_target_path(project, proposal["target_node"])
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         frontmatter, body = split_frontmatter(target.read_text(encoding="utf-8"))

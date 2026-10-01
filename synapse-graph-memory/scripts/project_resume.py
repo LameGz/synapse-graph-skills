@@ -121,7 +121,8 @@ def main() -> int:
   project_resume.py --project . --focus auth --json
 """,
     )
-    parser.add_argument("--project", default=".")
+    parser.add_argument("--project", "--project-root", dest="project", default=".",
+                        help="Project root (alias: --project-root)")
     parser.add_argument("--focus")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()

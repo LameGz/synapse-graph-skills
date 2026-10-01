@@ -27,7 +27,7 @@ def scan_python(filepath):
 
     results = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             args = [a.arg for a in node.args.args]
             returns = ""
             if node.returns:
@@ -35,7 +35,8 @@ def scan_python(filepath):
                     returns = ast.unparse(node.returns)
                 except AttributeError:
                     returns = "Any"
-            signature = f"def {node.name}({', '.join(args)})"
+            keyword = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+            signature = f"{keyword} {node.name}({', '.join(args)})"
             if returns:
                 signature += f" -> {returns}"
             decorators = []

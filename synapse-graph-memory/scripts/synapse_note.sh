@@ -93,6 +93,11 @@ esac
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ABS="$(cd "$PROJECT" && pwd)"
+# Native Windows Python cannot resolve MSYS-style absolute paths (/tmp, /f/...);
+# translate to a Windows path when running under Git Bash / MSYS.
+if command -v cygpath >/dev/null 2>&1; then
+  PROJECT_ABS="$(cygpath -m "$PROJECT_ABS" 2>/dev/null || printf '%s\n' "$PROJECT_ABS")"
+fi
 DEFAULT_PROPOSAL=0
 if [ -z "$PROPOSAL" ]; then
   PROPOSAL="$PROJECT_ABS/.synapse-proposal.json"
