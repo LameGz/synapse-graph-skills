@@ -117,23 +117,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate evals.json files
-        run: |
-          for f in synapse-*/evals/evals.json; do
-            echo "Validating $f"
-            python3 -c "
-import json, sys
-with open('$f') as fh:
-    data = json.load(fh)
-assert 'skill_name' in data, 'missing skill_name'
-assert 'evals' in data, 'missing evals array'
-assert len(data['evals']) > 0, 'no eval cases'
-for i, ev in enumerate(data['evals']):
-    assert 'id' in ev, f'eval {i}: missing id'
-    assert 'prompt' in ev, f'eval {i}: missing prompt'
-    assert 'assertions' in ev, f'eval {i}: missing assertions'
-print(f'  {len(data[\"evals\"])} eval cases — OK')
-"
-          done
+        run: python3 scripts/validate_fixtures.py evals
 
   validate-adapters:
     name: Validate host adapters
