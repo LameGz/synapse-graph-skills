@@ -9,7 +9,7 @@
 # Registration: "PreToolUse": [{ "matcher": "Read", "command": "..." }]
 set -euo pipefail
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$PWD}"
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-${CLAUDE_PROJECT_ROOT:-$PWD}}"
 MARKER="${PROJECT_ROOT}/.claude/.synapse_cache/.map_read"
 
 # ─── Parse tool call from stdin (JSON) ─────────────────────────────────

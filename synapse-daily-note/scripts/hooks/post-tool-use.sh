@@ -36,7 +36,7 @@ case "$file_path" in
   */archive/*) exit 0 ;;
 esac
 
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$PWD}"
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-${CLAUDE_PROJECT_ROOT:-$PWD}}"
 file_abs="${PROJECT_ROOT}/${file_path}"
 
 if [ ! -f "$file_abs" ]; then

@@ -108,6 +108,7 @@ jobs:
           bash tests/test_suggest_edges_dedup.sh
           python tests/test_memory_inbox.py
           python tests/test_project_resume.py
+          python tests/test_audit_regressions.py
 
   validate-eval-fixtures:
     name: Validate eval fixtures

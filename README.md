@@ -14,7 +14,7 @@ For solo full-stack developers, project memory lives in chat history: it evapora
 
 **Seamless in both directions** — the v1.5 theme:
 
-- **Seamless writes (SessionEnd)**: at session end, a hook extracts memory-worthy changes from git diff / conversation signals — high-confidence items (≥70%) land silently, low-confidence ones queue in the Memory Inbox for review. Just keep coding.
+- **Seamless writes (SessionEnd)**: at session end, a hook extracts git changes and user-text conversation signals. High-confidence source changes (≥70%) update their existing target node; conversation signals, unknown targets and low-confidence items queue in the Memory Inbox. Assistant/tool text never becomes an automatic decision.
 - **Seamless reads (UserPromptSubmit)**: when you ask something, a hook injects summaries of relevant memory nodes into context — Chinese prompts included (built-in cross-language topic aliases like 支付 → payment). No "load memory" incantation.
 
 **Disciplined retrieval** — MAP first, then the target node, then bounded BFS (depth ≤ 2, width ≤ 5). Context stays flat no matter how many modules you have.
@@ -73,8 +73,8 @@ User: How does the payment flow run from frontend button to database?
 
 ```
 WRITE: SessionEnd → session-end.sh → auto_observe.py (git diff + signal extraction)
-         → confidence ≥70%: synapse_note.sh applies directly + incremental MAP rebuild
-         → confidence <70%: memory_inbox.py queues in .synapse/inbox.json
+         → source change ≥70% + known target: session_memory.py applies structured target + MAP rebuild
+         → conversation / unknown target / confidence <70%: Memory Inbox review
 
 READ:  UserPromptSubmit → prefetch_context.py
          → CJK-aware tokenizing + topic aliases + optional FTS5 BM25
