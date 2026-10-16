@@ -61,7 +61,7 @@ bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "wired up P
 
 ### Query by asking
 
-```
+```text
 User: How is the login feature going?
 User: Which pages does changing the orders table affect?
 User: How does the payment flow run from frontend button to database?
@@ -71,7 +71,7 @@ User: How does the payment flow run from frontend button to database?
 
 ## How the seamlessness works
 
-```
+```text
 WRITE: SessionEnd → session-end.sh → auto_observe.py (git diff + signal extraction)
          → source change ≥70% + known target: session_memory.py applies structured target + MAP rebuild
          → conversation / unknown target / confidence <70%: Memory Inbox review
@@ -147,7 +147,7 @@ The core win is **reading discipline**: without the skill the agent defensively 
 
 ## Repository structure
 
-```
+```text
 synapse-graph-skills/
 ├── synapse-graph-memory/     # Core engine (canonical) — retrieval, BFS, SQLite, prefetch, auto-write
 │   ├── SKILL.md              # Retrieval protocol + autonomous writing rules

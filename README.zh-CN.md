@@ -61,7 +61,7 @@ bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "接好了 
 
 ### 查询就说话
 
-```
+```text
 用户:登录功能做得怎么样了?
 用户:改 orders 表会影响哪些页面?
 用户:支付链路从前端到数据库怎么通的?
@@ -71,7 +71,7 @@ bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "接好了 
 
 ## 无感是怎么发生的
 
-```
+```text
 写入:SessionEnd → session-end.sh → auto_observe.py(git diff + 信号提取)
         → 源码变化 ≥70% 且目标已存在: session_memory.py 保留结构化目标落库 + 重建 MAP
         → 对话信号 / 未知目标 / 低置信度: Memory Inbox 待审
@@ -146,7 +146,7 @@ python scripts/build_dist.py --package  # 重新打包 4 个 .skill
 
 ## 仓库结构
 
-```
+```text
 synapse-graph-skills/
 ├── synapse-graph-memory/     # 核心引擎(canonical)——检索、BFS、SQLite、预取、自动写入
 │   ├── SKILL.md              # 检索协议 + 自主写入规则

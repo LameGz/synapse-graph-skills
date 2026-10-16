@@ -4,7 +4,7 @@
 
 Each skill follows the [skill-creator](https://docs.anthropic.com/claude-code) format:
 
-```
+```text
 skill-name/
 ├── SKILL.md          # Required: YAML frontmatter + markdown instructions
 ├── scripts/          # Executable automation (bash + Python stdlib)
