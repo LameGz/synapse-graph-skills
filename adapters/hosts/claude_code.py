@@ -13,6 +13,7 @@ Existing user hooks are preserved; Synapse entries are appended idempotently.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 NAME = "claude-code"
@@ -27,23 +28,27 @@ def detect(project: Path) -> bool:
     return (project / ".claude").is_dir()
 
 
-def _hook_cmd(command: str) -> dict:
-    return {"type": "command", "command": command}
+def _hook_cmd(command: str, timeout: int | None = None) -> dict:
+    hook = {"type": "command", "command": command}
+    if timeout is not None:
+        hook["timeout"] = timeout
+    return hook
 
 
 def _merge_hooks(settings: dict, hooks: dict) -> dict:
     for event, entries in hooks.items():
         bucket = settings.setdefault("hooks", {}).setdefault(event, [])
-        existing_cmds = {
-            h.get("command")
-            for matcher in bucket
-            for h in matcher.get("hooks", [])
-        }
-        for new_matcher in entries:
-            new_cmds = {h.get("command") for h in new_matcher.get("hooks", [])}
-            if new_cmds & existing_cmds:
-                continue
-            bucket.append(new_matcher)
+        def script(command):
+            match = re.search(r'"([^"\n]+/scripts/(?:hooks/)?[^"\n]+)"', command or "")
+            return match.group(1) if match else None
+        managed = {script(h.get("command")) for entry in entries for h in entry.get("hooks", [])}
+        # Replace our prior commands (including old env names/timeouts), preserving user hooks.
+        kept = []
+        for entry in bucket:
+            hooks = [h for h in entry.get("hooks", []) if script(h.get("command")) not in managed]
+            if hooks:
+                kept.append({**entry, "hooks": hooks})
+        bucket[:] = entries + kept
     return settings
 
 
@@ -56,7 +61,7 @@ def install(project: Path, synapse_root: Path) -> list[str]:
     root = synapse_root.as_posix()
     hooks = {
         "SessionEnd": [
-            {"matcher": "", "hooks": [_hook_cmd(f'{bash} "{root}/scripts/hooks/session-end.sh"')]},
+            {"matcher": "", "hooks": [_hook_cmd(f'{bash} "{root}/scripts/hooks/session-end.sh"', timeout=60)]},
         ],
         "UserPromptSubmit": [
             {
@@ -64,7 +69,7 @@ def install(project: Path, synapse_root: Path) -> list[str]:
                 "hooks": [
                     _hook_cmd(
                         f'{py} "{scripts_dir.as_posix()}/prefetch_context.py" '
-                        f'--project "$CLAUDE_PROJECT_ROOT"'
+                        f'--project "${{CLAUDE_PROJECT_DIR}}"'
                     )
                 ],
             },

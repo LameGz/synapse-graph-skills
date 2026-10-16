@@ -12,7 +12,7 @@ Three design principles:
 
 ## System Layers
 
-```
+```text
 ┌──────────────────────────────────────────────┐
 │  Layer 0: Skills (SKILL.md)                  │
 │  Brain — retrieval protocol, trigger patterns │
@@ -93,7 +93,7 @@ summary: Login page UI connected to /api/v1/auth/login, session persistence done
 
 ## Retrieval Protocol — Three-Layer Progressive Disclosure
 
-```
+```text
 Layer 1: MEMORY_MAP.md Tag Index + summaries  (~200-500 tok)
     │
     ├── Match found, simple query → STOP
@@ -113,7 +113,7 @@ Key constraint: **never load all nodes**. At 30+ modules, brute-force reading co
 
 ## Four-Skill Architecture
 
-```
+```text
 synapse-graph-memory (core, always loaded)
 ├── Retrieval Protocol (decision tree)
 ├── Node spec + critical rules + anti-patterns
@@ -138,7 +138,7 @@ Each skill is **independently installable**. Script duplication across skills is
 
 ## Script Dependency Graph
 
-```
+```text
 synapse_note.sh
 ├── ingest_memory.py          (NL → structured JSON)
 ├── suggest_edges.sh           (auto-detect cross-module edges)
@@ -155,7 +155,7 @@ query_timeline.sh              (self-contained, bash + embedded Python)
 
 ## Hook Lifecycle
 
-```
+```text
 Session start
   │
   ├── PreToolUse: Intercept file reads → enforce protocol order

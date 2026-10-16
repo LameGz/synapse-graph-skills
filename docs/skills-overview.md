@@ -81,7 +81,7 @@ Synapse is shipped as four independently installable skills. Install one, severa
 
 ### Pipeline stages
 
-```
+```text
 synapse_note.sh --text "接好了 POST /api/v1/auth/login，返回 JWT"
     │
     ├── Stage 1: ingest_memory.py       NL → structured JSON proposal

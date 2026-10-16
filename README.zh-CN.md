@@ -14,7 +14,7 @@ GitHub:[LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-ski
 
 **双向无感**——这是 v1.5 的主线:
 
-- **写入无感(SessionEnd)**:会话结束时,hook 自动从 git diff / 对话信号里提取值得记的变化——高置信度(≥70%)静默落库,低置信度进 Memory Inbox 待审。你正常写代码就行。
+- **写入无感(SessionEnd)**:会话结束时,hook 提取 git 变化及用户发言信号。高置信度(≥70%)源码变更写入已有目标节点;对话信号、未知目标和低置信度提案进入 Memory Inbox 待审。助手和工具输出不会自动变成已确认决策。
 - **读取无感(UserPromptSubmit)**:你提问时,hook 自动把与问题相关的记忆节点摘要注入上下文——支持中文提问(内置"支付→payment"这类跨语言话题映射)。你不用说"加载记忆"。
 
 **检索有纪律**——MAP 优先、目标节点其次、受限 BFS(depth≤2, width≤5)展开,模块再多上下文也不爆炸。
@@ -61,7 +61,7 @@ bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "接好了 
 
 ### 查询就说话
 
-```
+```text
 用户:登录功能做得怎么样了?
 用户:改 orders 表会影响哪些页面?
 用户:支付链路从前端到数据库怎么通的?
@@ -71,10 +71,10 @@ bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "接好了 
 
 ## 无感是怎么发生的
 
-```
+```text
 写入:SessionEnd → session-end.sh → auto_observe.py(git diff + 信号提取)
-        → 置信度 ≥70%: synapse_note.sh 直接落库 + 增量重建 MAP
-        → 置信度 <70%: memory_inbox.py 进 .synapse/inbox.json 待审
+        → 源码变化 ≥70% 且目标已存在: session_memory.py 保留结构化目标落库 + 重建 MAP
+        → 对话信号 / 未知目标 / 低置信度: Memory Inbox 待审
 
 读取:UserPromptSubmit → prefetch_context.py
         → 中文分词 + 话题别名 + 可选 FTS5 BM25
@@ -146,7 +146,7 @@ python scripts/build_dist.py --package  # 重新打包 4 个 .skill
 
 ## 仓库结构
 
-```
+```text
 synapse-graph-skills/
 ├── synapse-graph-memory/     # 核心引擎(canonical)——检索、BFS、SQLite、预取、自动写入
 │   ├── SKILL.md              # 检索协议 + 自主写入规则

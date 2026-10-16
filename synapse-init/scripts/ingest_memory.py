@@ -72,10 +72,18 @@ def extract(text: str):
     for topic, aliases in TOPIC_ALIASES.items():
         if any(alias.lower() in lower for alias in aliases):
             topics.append(topic)
-    return {"api_endpoints": endpoints, "routes": routes, "fields": fields, "components": components, "topics": sorted(set(topics))}
+    explicit = re.match(r"^\s*\[((?:proj|mod|feat|db|api|ui|dep)_[\w-]+)\]", text)
+    return {"api_endpoints": endpoints, "routes": routes, "fields": fields, "components": components,
+            "topics": sorted(set(topics)), "target_node": explicit.group(1) if explicit else None}
 
 
 def choose_target(nodes, extracted):
+    if extracted.get("target_node"):
+        wanted = extracted["target_node"]
+        for node in nodes:
+            if node["frontmatter"].get("id") == wanted or Path(node["path"]).stem == wanted:
+                return "update_node", node["path"]
+        raise ValueError(f"Explicit target node does not exist: {wanted}")
     scores = []
     terms = set(extracted["topics"] + extracted["api_endpoints"] + extracted["routes"] + extracted["components"])
     for node in nodes:
@@ -92,7 +100,7 @@ def choose_target(nodes, extracted):
                 score += 3 if term.startswith(("GET ", "POST ", "PUT ", "DELETE ", "PATCH ")) else 1
         node_id = str(fm.get("id", ""))
         node_type = str(fm.get("type", ""))
-        if node_id.startswith("feat_") or node_type == "feature":
+        if score > 0 and (node_id.startswith("feat_") or node_type == "feature"):
             score += 5
         scores.append((score, node["path"]))
     scores.sort(reverse=True)

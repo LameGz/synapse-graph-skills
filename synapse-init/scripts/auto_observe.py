@@ -248,10 +248,36 @@ def merge_proposals(proposals):
 
 # ─── Main ─────────────────────────────────────────────────────────────
 
+def read_transcript(path, user_only=False):
+    """Host transcripts are untrusted: take user text blocks, never tool results."""
+    with open(path, encoding='utf-8-sig') as stream:
+        text = stream.read()
+    if not user_only:
+        return text
+    messages = []
+    for line in text.splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict) or record.get('type') != 'user':
+            continue
+        message = record.get('message') or {}
+        if not isinstance(message, dict) or message.get('role') != 'user':
+            continue
+        content = message.get('content', '')
+        if isinstance(content, str):
+            messages.append(content)
+        elif isinstance(content, list):
+            messages.extend(block['text'] for block in content
+                            if isinstance(block, dict) and block.get('type') == 'text' and isinstance(block.get('text'), str))
+    return '\n'.join(messages)
+
 def main():
     parser = argparse.ArgumentParser(description='Auto-observe session signals')
     parser.add_argument('--project', required=True, help='Project root')
     parser.add_argument('--transcript', help='Conversation transcript file')
+    parser.add_argument('--transcript-user-only', action='store_true', help='Only read user text from host JSONL records')
     parser.add_argument('--min-confidence', type=int, default=40,
                        help='Minimum confidence to include (default: 40)')
     parser.add_argument('--changed-file', help='Single changed file (hook mode)')
@@ -285,14 +311,9 @@ def main():
     transcript_text = ''
     if args.transcript and os.path.exists(args.transcript):
         try:
-            with open(args.transcript, 'r', encoding='utf-8') as f:
-                transcript_text = f.read()
-        except UnicodeDecodeError:
-            try:
-                with open(args.transcript, 'r', encoding='utf-8-sig') as f:
-                    transcript_text = f.read()
-            except Exception:
-                pass
+            transcript_text = read_transcript(args.transcript, user_only=args.transcript_user_only)
+        except (OSError, UnicodeDecodeError):
+            pass
         conv_proposals = extract_conversation_signals(transcript_text)
         proposals.extend(conv_proposals)
 
