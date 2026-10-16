@@ -1,190 +1,134 @@
 # Synapse Graph Skills
 
-> **给编码智能体的文件化工程记忆**——写入无感、读取无感、多宿主可插拔。你不用再记住"记录一下",也不用再解释"上次做到哪了"。
+**把项目结构、变更与决策写成可检查的文件记忆，让编码智能体按需找回上下文。**
 
-GitHub:[LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills) · [English](README.md) · [使用指南](USAGE.md) · [架构文档](docs/architecture.md)
+[English](README.md) · [使用指南](USAGE.md) · [架构](docs/architecture.md) · [宿主适配器](adapters/README.md) · [CI](https://github.com/LameGz/synapse-graph-skills/actions)
 
----
-
-## 它解决什么问题
-
-个人全栈开发者的项目记忆散落在对话历史里:换个会话就丢,换个工具就断,模块一多就只能靠暴力重读文件。Synapse 把工程记忆落成 **`meta/*.md` 图节点 + 自动生成的 MEMORY_MAP 索引**——Markdown 是唯一事实源,SQLite 只是可删的缓存,零外部服务。
-
-## 核心能力(v1.5)
-
-**双向无感**——这是 v1.5 的主线:
-
-- **写入无感(SessionEnd)**:会话结束时,hook 提取 git 变化及用户发言信号。高置信度(≥70%)源码变更写入已有目标节点;对话信号、未知目标和低置信度提案进入 Memory Inbox 待审。助手和工具输出不会自动变成已确认决策。
-- **读取无感(UserPromptSubmit)**:你提问时,hook 自动把与问题相关的记忆节点摘要注入上下文——支持中文提问(内置"支付→payment"这类跨语言话题映射)。你不用说"加载记忆"。
-
-**检索有纪律**——MAP 优先、目标节点其次、受限 BFS(depth≤2, width≤5)展开,模块再多上下文也不爆炸。
-
-**多宿主可插拔**——同一套记忆策略,按宿主生命周期归一化:
-
-| 宿主 | 接入方式 | 无感程度 |
-|------|---------|---------|
-| Claude Code | hooks(SessionEnd / UserPromptSubmit / PreToolUse / PostToolUse) | 完全无感 |
-| Codex CLI / Gemini CLI / Pi / Zed / OpenCode / Cursor | AGENTS.md 托管指令段 | 半无感(按指令自动执行) |
-| 其他 | `.synapse/agent-instructions.md` 手动接线 | 手动 |
-
-**单一来源构建**——全部脚本以 `synapse-graph-memory/scripts/` 为 canonical,其余 Skill 的副本由 `build_dist.py` 构建期同步,CI 用 `--check` 门禁防漂移。
-
-**零依赖**——bash 4+、Python 3.8+ 标准库(sqlite3/ast/json/re),无 pip 包、无 npm 包、无外部 API、无向量数据库。
-
----
+工程事实保存在 `meta/*.md` 节点中，`MEMORY_MAP.md` 与 `MEMORY_MAP.json` 由节点生成，SQLite 用作可重建的检索缓存。项目、模块、功能、数据库、API、页面和部署节点通过关系连接，帮助回答“上次改了什么”“改这里会影响哪里”。
 
 ## 快速开始
 
-```bash
-# 1. 安装核心 Skill
-cp -r synapse-graph-memory ~/.claude/skills/
+需要 Git、Bash 4+ 和 Python。CI 验证 Python 3.12 的 Windows/Linux 环境；核心脚本使用 Python 标准库，无需安装 pip 或 npm 运行时依赖。Windows 使用 Git Bash/MSYS，macOS 需另备 Bash 4+。
 
-# 2. 在目标项目里初始化记忆(全栈项目加 --fullstack)
-bash ~/.claude/skills/synapse-graph-memory/scripts/init.sh --project /path/to/project
-
-# 3. 安装宿主适配器(自动探测;也可显式指定 claude-code / codex / gemini-cli / pi / generic)
-python adapters/install_adapter.py auto --project /path/to/project
-```
-
-然后正常干活。想看自动记了什么:
+在 Git Bash 或其他 Bash 4+ 终端执行：
 
 ```bash
-python synapse-graph-memory/scripts/memory_inbox.py list --project .
-python synapse-graph-memory/scripts/project_resume.py --project .   # 或 --project-root .
+git clone https://github.com/LameGz/synapse-graph-skills.git
+cd synapse-graph-skills
+bash synapse-graph-memory/scripts/init.sh --project "/absolute/path/to/your-project"
+python adapters/install_adapter.py claude-code --project "/absolute/path/to/your-project"
 ```
 
-手动记录(v1.4 后通常不需要):
+目标项目目录必须已存在；全栈扫描可在 `init.sh` 后增加 `--fullstack`。初始化生成记忆节点与索引，适配器为该项目注册宿主指令或 hooks。先检查生成内容，再纳入项目版本控制。
+
+上例让 hooks 引用本仓库中的脚本，请保留该目录。也可以把核心技能安装到固定位置，再通过 `--synapse-root "/path/to/synapse-graph-memory"` 指定。只有 `.skill` 包时，需按宿主方式安装技能；适配器安装器本身在本仓库的 `adapters/` 中。
+
+## 选择宿主
 
 ```bash
-bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "接好了 POST /api/v1/auth/login,返回 JWT"
+python adapters/install_adapter.py list
+python adapters/install_adapter.py codex --project "/absolute/path/to/your-project"
 ```
 
-### 查询就说话
+| 宿主 | 实际接入方式 |
+|---|---|
+| Claude Code | `.claude/settings.json`：提问预取、读写提示、会话结束提案处理 |
+| Codex、Pi、Zed、OpenCode、Cursor 等 | `AGENTS.md` 托管指令段，依赖宿主执行指令 |
+| Gemini CLI | `GEMINI.md` 托管指令段 |
+| 通用宿主 | `.synapse/agent-instructions.md`，由使用者接线 |
 
-```text
-用户:登录功能做得怎么样了?
-用户:改 orders 表会影响哪些页面?
-用户:支付链路从前端到数据库怎么通的?
-```
+`auto` 可探测宿主，多个宿主共存时宜显式选择。Claude 适配器使用 `CLAUDE_PROJECT_DIR`，重新安装会更新自身旧 hook 并保留自定义 hook；SessionEnd 配置 60 秒预算。配置可安装不代表所有宿主行为均已端到端验收。
 
----
+## 读取与写入的规则
 
-## 无感是怎么发生的
+读取顺序是 **MAP → 相关节点 → 有界邻域**。检索展开限制深度与宽度（depth ≤ 2、width ≤ 5），减少无关内容；节点自身大小、索引生成和检索仍有成本，不承诺项目变大后总成本恒定。
 
-```text
-写入:SessionEnd → session-end.sh → auto_observe.py(git diff + 信号提取)
-        → 源码变化 ≥70% 且目标已存在: session_memory.py 保留结构化目标落库 + 重建 MAP
-        → 对话信号 / 未知目标 / 低置信度: Memory Inbox 待审
+Claude 的提问 hook 可以预取相关摘要；其他适配器靠指令约定执行。预取无匹配时可无输出。摘要进入宿主上下文后的处理位置取决于宿主与模型配置，本地文件存储不等于上下文永不离机。
 
-读取:UserPromptSubmit → prefetch_context.py
-        → 中文分词 + 话题别名 + 可选 FTS5 BM25
-        → 相关节点摘要注入上下文(预算 ~450 token,无匹配则静默)
+SessionEnd 的自动路径按来源与目标分流：
 
-守护:PreToolUse/PostToolUse → MAP-first 协议提醒、影响面提示、节点 frontmatter 校验
-```
+| 提案 | 去向 |
+|---|---|
+| `git_diff` / `hook` 来源、置信度至少 70、目标节点存在 | 校验目标后按原结构化对象写入该节点 |
+| 用户对话信号 | Memory Inbox 待审 |
+| 未知目标或低置信度 | Memory Inbox 待审 |
+| 助手与工具结果文本 | 不作为该对话抽取路径的用户决策来源 |
 
-适配器只做生命周期归一化,**不含记忆策略**——策略全部在共享脚本里(见 [adapters/README.md](adapters/README.md))。新增宿主 = 在 `adapters/hosts/` 丢一个含 `NAME / ALIASES / detect / install` 的 Python 模块。
+这里的置信度是规则评分，不是统计校准过的概率。对话抽取使用启发式规则，可能漏记。每次处理使用独立提案目录，高低分桶都写入当前结果，包括空集合，避免复用上一轮文件。
 
----
+## 查看与人工记录
 
-## 四个 Skill(独立可安装,按需选择)
-
-| Skill | 功能 | 安装场景 |
-|-------|------|---------|
-| **[synapse-graph-memory](synapse-graph-memory/)** | 核心引擎——检索协议 + 链路追踪 + 无感读写(canonical) | 所有场景必装 |
-| **[synapse-timeline](synapse-timeline/)** | 只读时间线 & Open Issues 查询 | 只要"最近改了啥" |
-| **[synapse-daily-note](synapse-daily-note/)** | NL → 记忆写入管线 | 手动记录 |
-| **[synapse-init](synapse-init/)** | 冷启动向导(薄 wrapper,委托核心引擎) | 新项目/已有项目初始化 |
-
-## 全栈 7 类节点
-
-| 类型 | 前缀 | 示例 |
-|------|------|------|
-| 项目 | `proj_` | `proj_project`——锚点、状态、范围 |
-| 模块 | `mod_` | `mod_auth`——服务或包边界 |
-| 功能 | `feat_` | `feat_checkout`——业务能力 |
-| 数据库表 | `db_` | `db_orders`——字段、索引、外键 |
-| API 端点组 | `api_` | `api_payment-routes`——按 router 文件分组 |
-| UI 页面 | `ui_` | `ui_checkout-page`——页面状态、API 调用 |
-| 部署单元 | `dep_` | `dep_container-config`——环境变量桥接 |
+以下命令从本仓库根目录执行，`--project` 始终指向目标项目：
 
 ```bash
-init.sh --fullstack   # 四层扫描:DB schema → API 路由 → UI 页面 → 部署配置
+python synapse-graph-memory/scripts/project_resume.py --project "/absolute/path/to/your-project"
+python synapse-graph-memory/scripts/memory_inbox.py list --project "/absolute/path/to/your-project"
 ```
 
-## 单一来源构建
+检查一条待审提案及其来源后，使用列表中的实际 ID 应用：
 
 ```bash
-python scripts/build_dist.py            # 把 canonical 脚本同步进各 Skill
-python scripts/build_dist.py --check    # 漂移检查(CI 门禁)
-python scripts/build_dist.py --package  # 重新打包 4 个 .skill
+python synapse-graph-memory/scripts/memory_inbox.py apply --project "/absolute/path/to/your-project" --id ITEM_ID
+python synapse-graph-memory/scripts/generate_memory_map.py --project "/absolute/path/to/your-project" --full
 ```
 
-规则见 `scripts/dist-manifest.json`(synapse-init 的 `init.sh` 委托 wrapper 通过 `keep` 保留)。**不要手改各 Skill 里的同步副本。**
+手动记录可先生成提案预览，显式节点标记保留目标：
 
----
-
-## 基准数据
-
-> **数据出处**:v1.0 表来自 2 条实跑 eval 记录([EVAL_REPORT.md](EVAL_REPORT.md) 与 `synapse-graph-memory-workspace/`);v1.2/v1.4 的性能与准确率数字为**理论测算/模拟数据,非实测基准**。可复现的离线测试在 `tests/`。
-
-### v1.0 基线(8 节点测试项目,deepseek-v4-pro,实跑)
-
-| 指标 | 装 Skill | 不装 | 变化 |
-|------|---------|------|------|
-| 平均读取文件数 | **8.0** | 13.0 | **-38%** |
-| 无关文件 | **0** | 4.5 | 核心优势 |
-| 断言通过率 | **100%** | 62.5% | — |
-
-核心收益是**读取纪律**:不装 Skill 时 Agent 出于保险把 MAP、缓存、全部节点都读一遍;装了之后按需加载。30+ 模块时差距进一步拉大——暴力加载随模块数线性增长,受限 BFS 保持常数级。
-
-## 平台与依赖
-
-- **Windows**(Git Bash/MSYS)、**macOS**(bash 4+:`brew install bash`)、**Linux**
-- Python 3.8+,仅标准库;解释器自动发现(`PYTHON_BIN` → `python3` → `python`)
-- Claude Code(hooks)或任意支持 AGENTS.md 的编码智能体
-
-## 仓库结构
-
-```text
-synapse-graph-skills/
-├── synapse-graph-memory/     # 核心引擎(canonical)——检索、BFS、SQLite、预取、自动写入
-│   ├── SKILL.md              # 检索协议 + 自主写入规则
-│   ├── references/           # 节点规范、补丁规则、全栈节点类型
-│   └── scripts/              # 26 个脚本:MAP、doctor、watch、auto_observe、prefetch 等
-├── synapse-timeline/         # 只读时间线(脚本由 build_dist 同步)
-├── synapse-daily-note/       # NL → 记忆写入管线(脚本由 build_dist 同步)
-├── synapse-init/             # 冷启动向导(薄 wrapper;脚本由 build_dist 同步)
-├── adapters/                 # 可插拔宿主适配器 + 安装器
-├── scripts/                  # build_dist.py 单一来源构建 + manifest
-├── tests/                    # 离线测试套件(CI 在 Ubuntu + Windows 上跑)
-├── docs/                     # 架构、贡献指南、设计文档
-├── EVOLUTION.md              # 版本演化日志
-├── EVAL_REPORT.md            # eval 实跑记录
-├── USAGE.md                  # 详细使用指南
-├── README.md                 # 英文 README
-└── README.zh-CN.md           # 本文件
+```bash
+bash synapse-graph-memory/scripts/synapse_note.sh --project "/absolute/path/to/your-project" --text "[mod_billing] 发票接口增加分页" --dry-run
 ```
 
-## 文档索引
+将 `mod_billing` 换为项目中存在的节点。移除 `--dry-run` 后进入正常提案应用流程；不要把未经核实的讨论当成已实现的工程事实。
 
-- [使用指南](USAGE.md) / [架构文档](docs/architecture.md) / [Skills 总览](docs/skills-overview.md)
-- [宿主适配器契约](adapters/README.md)——含"如何新增一个宿主"
-- [演化日志](EVOLUTION.md) · [v1.5 发布博客](docs/synapse-v1.5-release-blog.zh-CN.md)
-- [v2 双宿主 Proposal 协议设计](docs/superpowers/specs/2026-07-10-synapse-v2-dual-host-foundation-design.md)(下一步)
+## 文件与技能
 
-## 贡献
+| 文件 | 职责 |
+|---|---|
+| `meta/*.md` | 工程记忆事实源：摘要、关系、变更记录和待办问题 |
+| `MEMORY_MAP.md`、`MEMORY_MAP.json` | 生成索引，不作为独立事实维护 |
+| `.synapse/inbox.json` | 等待检查与应用的提案 |
+| `.synapse/adapter.json` | 安装的宿主与引擎位置 |
+| `.claude/.synapse_cache/auto-proposals/` | 逐次处理的提案分桶 |
 
-详见 [docs/contributing.md](docs/contributing.md)。改核心脚本后跑:`python scripts/build_dist.py && bash tests/test_legacy_capabilities.sh`。
+四个技能可按宿主需要独立安装：
 
-## 🙏 致谢
+| 技能 | 用途 |
+|---|---|
+| [synapse-graph-memory](synapse-graph-memory/) | 核心检索、图节点、预取与写入策略 |
+| [synapse-timeline](synapse-timeline/) | 时间线与 Open Issues 查询 |
+| [synapse-daily-note](synapse-daily-note/) | 自然语言到记忆提案的手动记录流程 |
+| [synapse-init](synapse-init/) | 初始化向导，委托核心脚本 |
 
-感谢 [Linux.do 社区](https://linux.do/)的讨论与反馈;记忆写入的生命周期设计受益于 [Nous Research Hermes Agent](https://github.com/NousResearch/hermes-agent) 的启发。
+## 与另外两个项目协作
 
-## 许可证
+[agent-tree](https://github.com/LameGz/agent-tree) 保存任务执行与验收证据，可显式导出 Synapse 兼容节点与关系；Synapse 保存供后续会话查阅的工程记忆。[Dream Layer](https://github.com/LameGz/dream-layer) 生成探索性观察；其输出需要人判断后才能进入工程记忆。三个仓库分别安装，没有默认自动串联所有写入。
 
-MIT——详见 [LICENSE](LICENSE)。
+## 开发与验证
 
----
+`synapse-graph-memory/scripts/` 是共享脚本的唯一维护来源。分发规则见 [scripts/dist-manifest.json](scripts/dist-manifest.json)，不要分别修改其他技能中的同步副本。
 
-**Synapse Graph Skills (v1.5)**——图拓扑记忆,让你的 AI 助手知道你上周做了什么,不需要你再解释一遍。**context 不应该随模块数爆炸,记忆不应该依赖人记住去记录,也不应该绑定在某一个智能体上。**
+```bash
+python scripts/build_dist.py --check
+bash tests/test_runner.sh --all
+bash tests/test_generate_memory_map_py.sh
+bash tests/test_suggest_edges_fast.sh
+bash tests/test_suggest_edges_dedup.sh
+python tests/test_memory_inbox.py
+python tests/test_project_resume.py
+python tests/test_audit_regressions.py
+bash tests/test_legacy_capabilities.sh
+```
+
+改共享脚本后先运行 `python scripts/build_dist.py` 同步；发布技能包时运行 `python scripts/build_dist.py --package`。四个 `.skill` 文件是分发产物。
+
+2026-10-16：14 项 Python 测试通过（含 8 项审计回归），MAP、边建议、legacy 与分发检查通过；GitHub Actions 的 14 个检查全部成功，包含 Windows/Linux 离线套件及适配器检查。`test_runner.sh --all` 的完整 eval 为 dry-run，不是模型质量实测。
+
+[EVAL_REPORT.md](EVAL_REPORT.md) 保留历史小样本记录，不能据此承诺一般准确率或规模化收益。真实宿主会话、并发行为和大型项目效果仍需在目标环境验证。
+
+更多资料：[技能总览](docs/skills-overview.md)、[贡献指南](docs/contributing.md)、[演化记录](EVOLUTION.md)。
+
+## 致谢与许可
+
+感谢 [Linux.do](https://linux.do/) 社区的讨论；记忆写入生命周期参考了 [Hermes Agent](https://github.com/NousResearch/hermes-agent) 的相关设计。
+
+[MIT License](LICENSE)。

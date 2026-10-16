@@ -1,191 +1,134 @@
 # Synapse Graph Skills
 
-> **File-based engineering memory for coding agents** — seamless writes, seamless reads, pluggable across hosts. Stop remembering to "log this"; stop re-explaining "where were we last time".
+**Keep project structure, changes and decisions in inspectable files, so coding agents can retrieve the context they need.**
 
-GitHub: [LameGz/synapse-graph-skills](https://github.com/LameGz/synapse-graph-skills) · [中文文档](README.zh-CN.md) · [Usage Guide](USAGE.md) · [Architecture](docs/architecture.md)
+[中文](README.zh-CN.md) · [Usage](USAGE.md) · [Architecture](docs/architecture.md) · [Host adapters](adapters/README.md) · [CI](https://github.com/LameGz/synapse-graph-skills/actions)
 
----
-
-## The problem it solves
-
-For solo full-stack developers, project memory lives in chat history: it evaporates across sessions, breaks across tools, and collapses into brute-force file re-reading as modules multiply. Synapse turns engineering memory into **`meta/*.md` graph nodes + an auto-generated MEMORY_MAP index** — Markdown is the single source of truth, SQLite is a disposable cache, zero external services.
-
-## Core capabilities (v1.5)
-
-**Seamless in both directions** — the v1.5 theme:
-
-- **Seamless writes (SessionEnd)**: at session end, a hook extracts git changes and user-text conversation signals. High-confidence source changes (≥70%) update their existing target node; conversation signals, unknown targets and low-confidence items queue in the Memory Inbox. Assistant/tool text never becomes an automatic decision.
-- **Seamless reads (UserPromptSubmit)**: when you ask something, a hook injects summaries of relevant memory nodes into context — Chinese prompts included (built-in cross-language topic aliases like 支付 → payment). No "load memory" incantation.
-
-**Disciplined retrieval** — MAP first, then the target node, then bounded BFS (depth ≤ 2, width ≤ 5). Context stays flat no matter how many modules you have.
-
-**Pluggable across hosts** — one memory policy, normalized per host lifecycle:
-
-| Host | Integration | Seamlessness |
-|------|-------------|--------------|
-| Claude Code | hooks (SessionEnd / UserPromptSubmit / PreToolUse / PostToolUse) | fully seamless |
-| Codex CLI / Gemini CLI / Pi / Zed / OpenCode / Cursor | managed AGENTS.md section | semi-seamless (instruction-driven) |
-| anything else | `.synapse/agent-instructions.md`, wired manually | manual |
-
-**Single-source build** — every script is canonical in `synapse-graph-memory/scripts/`; the other skills' copies are synced at build time by `build_dist.py`, with a `--check` drift gate in CI.
-
-**Zero dependencies** — bash 4+, Python 3.8+ stdlib only (sqlite3/ast/json/re). No pip packages, no npm packages, no external APIs, no vector database.
-
----
+Engineering facts live in `meta/*.md` nodes. `MEMORY_MAP.md` and `MEMORY_MAP.json` are generated indexes; SQLite is a rebuildable retrieval cache. Relations connect projects, modules, features, database tables, APIs, pages and deployment units, helping agents answer “what changed?” and “what does this affect?” across sessions.
 
 ## Quick start
 
-```bash
-# 1. Install the core skill
-cp -r synapse-graph-memory ~/.claude/skills/
+Requires Git, Bash 4+ and Python. CI validates Python 3.12 on Windows/Linux. Core scripts use the Python standard library, with no pip or npm runtime packages. Use Git Bash/MSYS on Windows and provide Bash 4+ separately on macOS.
 
-# 2. Initialize memory in your project (add --fullstack for DB+API+UI+deploy scanning)
-bash ~/.claude/skills/synapse-graph-memory/scripts/init.sh --project /path/to/project
-
-# 3. Install a host adapter (auto-detect; or explicit: claude-code / codex / gemini-cli / pi / generic)
-python adapters/install_adapter.py auto --project /path/to/project
-```
-
-Then work normally. To see what was recorded automatically:
+Run in Git Bash or another Bash 4+ terminal:
 
 ```bash
-python synapse-graph-memory/scripts/memory_inbox.py list --project .
-python synapse-graph-memory/scripts/project_resume.py --project .   # alias: --project-root .
+git clone https://github.com/LameGz/synapse-graph-skills.git
+cd synapse-graph-skills
+bash synapse-graph-memory/scripts/init.sh --project "/absolute/path/to/your-project"
+python adapters/install_adapter.py claude-code --project "/absolute/path/to/your-project"
 ```
 
-Manual recording (rarely needed after v1.4):
+The target directory must already exist. Add `--fullstack` to `init.sh` for full-stack scanning. Initialization creates nodes and indexes; the adapter registers project instructions or hooks. Inspect generated files before committing them to your project.
+
+These hooks reference scripts in this checkout, so keep it at a stable location. Alternatively, install the core skill elsewhere and pass `--synapse-root "/path/to/synapse-graph-memory"`. A `.skill` archive follows the host's skill-installation flow; the adapter installer itself lives in this repository's `adapters/` directory.
+
+## Choose a host
 
 ```bash
-bash synapse-graph-memory/scripts/synapse_note.sh --project . --text "wired up POST /api/v1/auth/login, returns JWT"
+python adapters/install_adapter.py list
+python adapters/install_adapter.py codex --project "/absolute/path/to/your-project"
 ```
 
-### Query by asking
+| Host | Integration |
+|---|---|
+| Claude Code | `.claude/settings.json`: prompt prefetch, read/write guidance, end-of-session proposals |
+| Codex, Pi, Zed, OpenCode, Cursor and aliases | Managed `AGENTS.md` section; relies on the host following instructions |
+| Gemini CLI | Managed `GEMINI.md` section |
+| Generic | `.synapse/agent-instructions.md`, connected by the user |
 
-```text
-User: How is the login feature going?
-User: Which pages does changing the orders table affect?
-User: How does the payment flow run from frontend button to database?
-```
+`auto` detects a host; choose explicitly when several hosts share a project. The Claude adapter uses `CLAUDE_PROJECT_DIR`. Reinstalling updates its own older hooks while retaining custom hooks, and sets a 60-second SessionEnd budget. Successful installation does not establish end-to-end behavior in every host.
 
----
+## Reading and writing rules
 
-## How the seamlessness works
+Read **MAP → relevant nodes → bounded neighborhood**. Retrieval bounds traversal depth and width (depth ≤ 2, width ≤ 5) to limit unrelated context. Node size, indexing and search still have costs; total cost is not guaranteed to remain constant as a project grows.
 
-```text
-WRITE: SessionEnd → session-end.sh → auto_observe.py (git diff + signal extraction)
-         → source change ≥70% + known target: session_memory.py applies structured target + MAP rebuild
-         → conversation / unknown target / confidence <70%: Memory Inbox review
+Claude's prompt hook can prefetch summaries; other adapters provide an instruction-driven workflow. No match may produce no output. Once summaries enter host context, their processing location depends on the host and model configuration. Local file storage does not guarantee that context stays on the machine.
 
-READ:  UserPromptSubmit → prefetch_context.py
-         → CJK-aware tokenizing + topic aliases + optional FTS5 BM25
-         → relevant node summaries injected (~450 token budget; silent when no match)
+The SessionEnd path routes proposals by source and target:
 
-GUARD: PreToolUse/PostToolUse → MAP-first protocol nudge, impact warning,
-         node frontmatter validation
-```
+| Proposal | Destination |
+|---|---|
+| `git_diff` / `hook` source, score at least 70, existing target | Validate the target and apply the original structured proposal there |
+| User conversation signal | Memory Inbox for review |
+| Unknown target or lower score | Memory Inbox for review |
+| Assistant and tool-result text | Excluded from user-decision extraction in this transcript path |
 
-Adapters only normalize lifecycle events — **memory policy always lives in the shared scripts** (see [adapters/README.md](adapters/README.md)). Adding a host = dropping a Python module with `NAME / ALIASES / detect / install` into `adapters/hosts/`.
+Confidence is a heuristic score, not a calibrated probability. Conversation extraction can miss decisions. Each invocation gets a separate proposal directory, and both partitions are written even when empty, preventing reuse of an earlier invocation's files.
 
----
+## Inspect and record
 
-## Four skills (independently installable)
-
-| Skill | Purpose | Install when |
-|-------|---------|--------------|
-| **[synapse-graph-memory](synapse-graph-memory/)** | Core engine — retrieval protocol, link tracing, seamless read/write (canonical) | always |
-| **[synapse-timeline](synapse-timeline/)** | Read-only timeline & Open Issues queries | you only want "what changed recently" |
-| **[synapse-daily-note](synapse-daily-note/)** | NL → memory write pipeline | you want manual recording |
-| **[synapse-init](synapse-init/)** | Cold-start wizard (thin wrapper delegating to the core) | initializing new or existing projects |
-
-## Full-stack node types (7)
-
-| Type | Prefix | Example |
-|------|--------|---------|
-| Project | `proj_` | `proj_project` — anchor, status, scope |
-| Module | `mod_` | `mod_auth` — service or package boundary |
-| Feature | `feat_` | `feat_checkout` — business capability |
-| DB table | `db_` | `db_orders` — fields, indexes, FKs |
-| API endpoints | `api_` | `api_payment-routes` — grouped by router file |
-| UI page | `ui_` | `ui_checkout-page` — page state, API calls |
-| Deployment | `dep_` | `dep_container-config` — env bridging |
+Run these commands from this checkout, always passing the target project:
 
 ```bash
-init.sh --fullstack   # scan DB schema → API routes → UI pages → deploy configs
+python synapse-graph-memory/scripts/project_resume.py --project "/absolute/path/to/your-project"
+python synapse-graph-memory/scripts/memory_inbox.py list --project "/absolute/path/to/your-project"
 ```
 
-## Single-source build
+After inspecting an item and its source, apply its actual ID from the list:
 
 ```bash
-python scripts/build_dist.py            # sync canonical scripts into each skill
-python scripts/build_dist.py --check    # drift check (CI gate)
-python scripts/build_dist.py --package  # rebuild the 4 .skill archives
+python synapse-graph-memory/scripts/memory_inbox.py apply --project "/absolute/path/to/your-project" --id ITEM_ID
+python synapse-graph-memory/scripts/generate_memory_map.py --project "/absolute/path/to/your-project" --full
 ```
 
-Rules live in `scripts/dist-manifest.json` (synapse-init's delegating `init.sh` is preserved via `keep`). **Never hand-edit synced copies inside dependent skills.**
+For manual recording, preview a proposal first. An explicit node marker preserves the target:
 
----
-
-## Benchmarks
-
-> **Data provenance**: the v1.0 table below comes from 2 recorded eval runs ([EVAL_REPORT.md](EVAL_REPORT.md) and `synapse-graph-memory-workspace/`). The v1.2/v1.4 performance and accuracy figures published earlier were **theoretical estimates / simulated data, not measured benchmarks**. Reproducible offline tests live in `tests/`.
-
-### v1.0 baseline (8-node SaaS fixture, deepseek-v4-pro, measured)
-
-| Metric | With Skill | Without Skill | Delta |
-|--------|-----------|---------------|-------|
-| Mean files read | **8.0** | 13.0 | **-38%** |
-| Irrelevant files | **0** | 4.5 | the key win |
-| Assertion pass rate | **100%** | 62.5% | — |
-
-The core win is **reading discipline**: without the skill the agent defensively loads the MAP, caches, and every node; with it, loading is on-demand. At 30+ modules the gap widens further — brute-force reading scales linearly while bounded BFS stays constant.
-
-## Platforms & dependencies
-
-- **Windows** (Git Bash/MSYS), **macOS** (bash 4+ via `brew install bash`), **Linux**
-- Python 3.8+, stdlib only; interpreter auto-discovery (`PYTHON_BIN` → `python3` → `python`)
-- Claude Code (hooks) or any AGENTS.md-spec coding agent
-
-## Repository structure
-
-```text
-synapse-graph-skills/
-├── synapse-graph-memory/     # Core engine (canonical) — retrieval, BFS, SQLite, prefetch, auto-write
-│   ├── SKILL.md              # Retrieval protocol + autonomous writing rules
-│   ├── references/           # Node specs, patch rules, full-stack node types
-│   └── scripts/              # 26 scripts: MAP, doctor, watch, auto_observe, prefetch, etc.
-├── synapse-timeline/         # Read-only timeline (scripts synced by build_dist)
-├── synapse-daily-note/       # NL → memory write pipeline (scripts synced by build_dist)
-├── synapse-init/             # Cold-start wizard (thin wrapper; scripts synced by build_dist)
-├── adapters/                 # Pluggable host adapters + installer
-├── scripts/                  # build_dist.py single-source build + manifest
-├── tests/                    # Offline test suite (CI runs it on Ubuntu + Windows)
-├── docs/                     # Architecture, contributing, design docs
-├── EVOLUTION.md              # Version evolution log
-├── EVAL_REPORT.md            # Recorded eval runs
-├── USAGE.md                  # Detailed usage guide
-├── README.md                 # This file
-└── README.zh-CN.md           # 中文文档
+```bash
+bash synapse-graph-memory/scripts/synapse_note.sh --project "/absolute/path/to/your-project" --text "[mod_billing] Added pagination to invoice endpoints" --dry-run
 ```
 
-## Documentation index
+Replace `mod_billing` with an existing node. Remove `--dry-run` for the normal proposal application flow. Discussion alone should not be recorded as completed engineering work.
 
-- [Usage guide](USAGE.md) · [Architecture](docs/architecture.md) · [Skills overview](docs/skills-overview.md)
-- [Host adapter contract](adapters/README.md) — includes "how to add a host"
-- [Evolution log](EVOLUTION.md) · [v1.5 release blog (中文)](docs/synapse-v1.5-release-blog.zh-CN.md)
-- [v2 dual-host Proposal protocol design](docs/superpowers/specs/2026-07-10-synapse-v2-dual-host-foundation-design.md) (next step)
+## Files and skills
 
-## Contributing
+| File | Responsibility |
+|---|---|
+| `meta/*.md` | Engineering memory: summaries, relations, changes and open issues |
+| `MEMORY_MAP.md`, `MEMORY_MAP.json` | Generated indexes, rather than separately maintained facts |
+| `.synapse/inbox.json` | Proposals waiting for inspection and application |
+| `.synapse/adapter.json` | Installed host and engine location |
+| `.claude/.synapse_cache/auto-proposals/` | Per-invocation proposal partitions |
 
-See [docs/contributing.md](docs/contributing.md). After touching core scripts: `python scripts/build_dist.py && bash tests/test_legacy_capabilities.sh`.
+Install the four skills independently as supported by your host:
 
-## 🙏 Acknowledgements
+| Skill | Purpose |
+|---|---|
+| [synapse-graph-memory](synapse-graph-memory/) | Core retrieval, nodes, prefetch and writing policy |
+| [synapse-timeline](synapse-timeline/) | Timeline and Open Issues queries |
+| [synapse-daily-note](synapse-daily-note/) | Manual natural-language-to-proposal workflow |
+| [synapse-init](synapse-init/) | Initialization wizard delegating to the core |
 
-Thanks to the [Linux.do community](https://linux.do/) for discussion and feedback; the lifecycle design of memory writes draws inspiration from the [Nous Research Hermes Agent](https://github.com/NousResearch/hermes-agent).
+## Working with the other projects
 
-## License
+[agent-tree](https://github.com/LameGz/agent-tree) stores task execution and acceptance evidence, and can explicitly export Synapse-compatible nodes and relations. Synapse stores engineering memory for later sessions. [Dream Layer](https://github.com/LameGz/dream-layer) produces exploratory observations, which require human judgment before becoming engineering memory. These repositories install separately; there is no default pipeline that automatically connects every write.
 
-MIT — see [LICENSE](LICENSE).
+## Development and validation
 
----
+`synapse-graph-memory/scripts/` is the maintenance source for shared scripts. Distribution rules live in [scripts/dist-manifest.json](scripts/dist-manifest.json); do not edit synchronized copies independently.
 
-**Synapse Graph Skills (v1.5)** — graph-topology memory so your AI assistant knows what you did last week without a briefing. **Context shouldn't explode with module count, memory shouldn't depend on you remembering to record — and it shouldn't be locked to one agent.**
+```bash
+python scripts/build_dist.py --check
+bash tests/test_runner.sh --all
+bash tests/test_generate_memory_map_py.sh
+bash tests/test_suggest_edges_fast.sh
+bash tests/test_suggest_edges_dedup.sh
+python tests/test_memory_inbox.py
+python tests/test_project_resume.py
+python tests/test_audit_regressions.py
+bash tests/test_legacy_capabilities.sh
+```
+
+After editing shared scripts, run `python scripts/build_dist.py` to synchronize copies. Run `python scripts/build_dist.py --package` to rebuild the four `.skill` distribution archives.
+
+On 2026-10-16, 14 Python tests passed, including eight audit regressions. MAP, edge-suggestion, legacy and distribution checks passed. All 14 GitHub Actions checks succeeded, including Windows/Linux offline suites and adapter checks. The full eval runner in `test_runner.sh --all` is a dry-run, not a model-quality benchmark.
+
+[EVAL_REPORT.md](EVAL_REPORT.md) preserves historical small-sample results, which do not establish general accuracy or scaling gains. Real host sessions, concurrent behavior and large-project results require validation in the target environment.
+
+More documentation: [Skills overview](docs/skills-overview.md), [Contributing](docs/contributing.md), [Evolution](EVOLUTION.md).
+
+## Acknowledgments and license
+
+Thanks to the [Linux.do](https://linux.do/) community for discussion. The memory-write lifecycle draws on related design ideas from [Hermes Agent](https://github.com/NousResearch/hermes-agent).
+
+[MIT License](LICENSE).
